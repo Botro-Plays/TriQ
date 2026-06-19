@@ -27,37 +27,57 @@ jobs:
       - name: Build server
         run: npm run build -w apps/server
 
-      - name: Deploy frontend to VPS
+      - name: Package frontend
+        run: |
+          cd apps/web
+          tar -czf ../../deploy-web.tar.gz dist/
+
+      - name: Package backend
+        run: |
+          cd apps/server
+          tar -czf ../../deploy-server.tar.gz dist/ prisma/ package.json
+
+      - name: Upload packages to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "apps/web/dist/*"
-          target: ${{ secrets.VPS_WEB_PATH }}
-          strip_components: 3
-          rm: true
+          source: "deploy-web.tar.gz,deploy-server.tar.gz"
+          target: "/tmp"
 
-      - name: Deploy backend to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "apps/server/dist/*,apps/server/prisma/*,apps/server/package.json"
-          target: ${{ secrets.VPS_SERVER_PATH }}
-          strip_components: 2
-
-      - name: Restart services on VPS
+      - name: Deploy and restart on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd ${{ secrets.VPS_SERVER_PATH }}
+            # Deploy frontend
+            sudo rm -rf /var/www/triq/*
+            sudo tar -xzf /tmp/deploy-web.tar.gz -C /var/www/triq --strip-components=1
+            sudo chown -R triq:triq /var/www/triq
+
+            # Deploy backend
+            sudo rm -rf /var/www/triq-server/*
+            sudo tar -xzf /tmp/deploy-server.tar.gz -C /var/www/triq-server --strip-components=1
+            sudo chown -R triq:triq /var/www/triq-server
+
+            # Install dependencies and start server
+            cd /var/www/triq-server
             npm install --production
             npx prisma generate
+            npx prisma migrate deploy || true
+            npx prisma db seed || true
+
+            # Reload nginx
             sudo nginx -t && sudo systemctl reload nginx
-            pm2 reload triq-server || pm2 start dist/index.js --name triq-server
-            echo "Full stack deployed"
+
+            # Start/restart PM2
+            pm2 delete triq-server || true
+            pm2 start dist/index.js --name triq-server --update-env
+            pm2 save --force
+
+            # Cleanup
+            rm -f /tmp/deploy-web.tar.gz /tmp/deploy-server.tar.gz
+            echo "Full stack deployed successfully"
