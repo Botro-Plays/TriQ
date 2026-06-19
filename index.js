@@ -2,8 +2,8 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const SERVER_DIR = __dirname;
-const REPO_ROOT = path.resolve(SERVER_DIR, '../..');
+const REPO_ROOT = __dirname;
+const SERVER_DIR = path.join(REPO_ROOT, 'apps', 'server');
 const DIST_FILE = path.join(SERVER_DIR, 'dist', 'index.js');
 
 function run(cmd, cwd, env = {}) {
@@ -16,7 +16,7 @@ function run(cmd, cwd, env = {}) {
 }
 
 async function start() {
-  // Fast path: pre-built dist exists (from GitHub Actions deploy branch)
+  // Fast path: pre-built dist exists
   if (fs.existsSync(DIST_FILE)) {
     console.log('[TriQ] Using pre-built dist.');
     require(DIST_FILE);
