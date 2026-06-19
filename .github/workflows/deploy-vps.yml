@@ -24,7 +24,10 @@ jobs:
       - name: Build web app
         run: npm run build -w apps/web
 
-      - name: Deploy to VPS
+      - name: Build server
+        run: npm run build -w apps/server
+
+      - name: Deploy frontend to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -35,12 +38,26 @@ jobs:
           strip_components: 3
           rm: true
 
-      - name: Restart nginx
+      - name: Deploy backend to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "apps/server/dist/*,apps/server/prisma/*,apps/server/package.json"
+          target: ${{ secrets.VPS_SERVER_PATH }}
+          strip_components: 2
+
+      - name: Restart services on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
+            cd ${{ secrets.VPS_SERVER_PATH }}
+            npm install --production
+            npx prisma generate
             sudo nginx -t && sudo systemctl reload nginx
-            echo "Deployed to ${{ secrets.VPS_WEB_PATH }}"
+            pm2 reload triq-server || pm2 start dist/index.js --name triq-server
+            echo "Full stack deployed"
