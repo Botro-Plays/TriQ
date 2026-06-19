@@ -88,7 +88,9 @@ jobs:
             rm -rf /var/www/triq/*
             tar -xzf /tmp/deploy-web.tar.gz -C /var/www/triq --strip-components=1
 
-            # Deploy backend (keep dist/ and prisma/ structure)
+            # Deploy backend (preserve config/ and .env)
+            cd /var/www/triq-server
+            rm -rf dist prisma package.json node_modules package-lock.json
             tar -xzf /tmp/deploy-server.tar.gz -C /var/www/triq-server
 
             # Install dependencies and start server
