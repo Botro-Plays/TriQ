@@ -1,12 +1,14 @@
-name: Deploy to VPS
+name: CI + Deploy to VPS
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,11 +23,40 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build web app
+      - name: Generate Prisma Client
+        run: npm run db:generate -w apps/server
+
+      - name: Build Server
+        run: npm run build -w apps/server
+
+      - name: Build Web
         run: npm run build -w apps/web
 
-      - name: Build server
+  deploy:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate -w apps/server
+
+      - name: Build Server
         run: npm run build -w apps/server
+
+      - name: Build Web
+        run: npm run build -w apps/web
 
       - name: Package frontend
         run: |
