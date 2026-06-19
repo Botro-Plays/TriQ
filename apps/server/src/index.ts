@@ -54,6 +54,7 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "https:", "https://*.google.com", "https://*.gstatic.com"],
       connectSrc: ["'self'", "https://*.firebaseio.com", "https://*.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://www.google.com"],
       frameSrc: ["'self'", "https://www.google.com", "https://*.firebaseapp.com"],
+      frameAncestors: ["'self'", "https://www.google.com"],
       childSrc: ["'self'", "blob:"],
     },
   },
