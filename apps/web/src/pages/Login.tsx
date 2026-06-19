@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import { auth, RecaptchaVerifier } from '../lib/firebase';
@@ -25,30 +25,43 @@ export default function Login() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const navigate = useNavigate();
 
-  const setupRecaptcha = useCallback(() => {
-    if (recaptchaRef.current) return;
-    recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-      size: 'invisible',
-      callback: () => {},
-      'expired-callback': () => {},
-    });
-  }, []);
-
   const sendOtp = async () => {
     setError('');
     setLoading(true);
     try {
       const formatted = phone.startsWith('+') ? phone : '+63' + phone.replace(/^0/, '');
-      // Test mode: no reCAPTCHA needed for test numbers
-      if (auth.settings.appVerificationDisabledForTesting) {
-        confirmationRef.current = await (signInWithPhoneNumber as any)(auth, formatted, undefined);
-      } else {
-        setupRecaptcha();
-        confirmationRef.current = await signInWithPhoneNumber(auth, formatted, recaptchaRef.current!);
+
+      // Clear any stale verifier
+      if (recaptchaRef.current) {
+        recaptchaRef.current.clear();
+        recaptchaRef.current = null;
       }
+
+      // Create and explicitly render invisible reCAPTCHA
+      const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+        callback: (response: string) => {
+          console.log('[reCAPTCHA] solved:', response ? 'token received' : 'empty');
+        },
+        'expired-callback': () => {
+          console.warn('[reCAPTCHA] expired, will retry');
+        },
+      });
+
+      recaptchaRef.current = verifier;
+      await verifier.render();
+      console.log('[reCAPTCHA] rendered');
+
+      confirmationRef.current = await signInWithPhoneNumber(auth, formatted, verifier);
       setStep('otp');
     } catch (err: any) {
+      console.error('sendOtp error:', err);
       setError(err.message || 'Failed to send OTP');
+      // Clean up on error
+      if (recaptchaRef.current) {
+        recaptchaRef.current.clear();
+        recaptchaRef.current = null;
+      }
     } finally {
       setLoading(false);
     }
@@ -98,7 +111,7 @@ export default function Login() {
         <p className="text-gray-400 mt-2">Tricycle Booking for Digos City</p>
       </div>
 
-      <div id="recaptcha-container" style={{ position: 'absolute', top: -9999, left: -9999, opacity: 0 }} />
+      <div id="recaptcha-container" />
 
       {step === 'phone' && (
         <div className="w-full max-w-sm space-y-4">
