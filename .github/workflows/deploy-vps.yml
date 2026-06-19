@@ -84,23 +84,19 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            # Deploy frontend
+            # Deploy frontend (strip dist/ prefix)
             rm -rf /var/www/triq/*
             tar -xzf /tmp/deploy-web.tar.gz -C /var/www/triq --strip-components=1
 
-            # Deploy backend
-            rm -rf /var/www/triq-server/*
-            tar -xzf /tmp/deploy-server.tar.gz -C /var/www/triq-server --strip-components=1
+            # Deploy backend (keep dist/ and prisma/ structure)
+            tar -xzf /tmp/deploy-server.tar.gz -C /var/www/triq-server
 
             # Install dependencies and start server
             cd /var/www/triq-server
-            npm install --production
-            npx prisma generate
-            npx prisma migrate deploy || true
-            npx prisma db seed || true
-
-            # Reload nginx
-            sudo nginx -t && sudo systemctl reload nginx
+            npm install --production --omit=dev
+            ./node_modules/.bin/prisma generate
+            ./node_modules/.bin/prisma migrate deploy || true
+            ./node_modules/.bin/prisma db seed || true
 
             # Start/restart PM2
             pm2 delete triq-server || true
