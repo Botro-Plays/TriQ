@@ -27,23 +27,20 @@ function backgroundDbSetup() {
   }
 
   console.log('[TriQ] [Background] Deploying database migrations...');
-  let migrateOk = false;
   try {
     run('npx prisma migrate deploy', SERVER_DIR);
-    migrateOk = true;
     console.log('[TriQ] [Background] Migrations applied.');
   } catch {
-    console.log('[TriQ] [Background] Migrate deploy failed. Will try db push...');
+    console.log('[TriQ] [Background] Migrate deploy failed or no migrations found.');
   }
 
-  if (!migrateOk) {
-    console.log('[TriQ] [Background] Pushing schema to database...');
-    try {
-      run('npx prisma db push --accept-data-loss', SERVER_DIR);
-      console.log('[TriQ] [Background] Schema pushed successfully.');
-    } catch {
-      console.log('[TriQ] [Background] DB push failed or already up to date.');
-    }
+  // Always push schema to ensure tables exist (idempotent)
+  console.log('[TriQ] [Background] Pushing schema to database...');
+  try {
+    run('npx prisma db push --accept-data-loss', SERVER_DIR);
+    console.log('[TriQ] [Background] Schema pushed successfully.');
+  } catch {
+    console.log('[TriQ] [Background] DB push failed or already up to date.');
   }
 
   console.log('[TriQ] [Background] Seeding database...');
