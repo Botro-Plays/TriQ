@@ -84,7 +84,8 @@ model User {
 
   passenger   Passenger?
   driver      Driver?
-  auditLogs   AuditLog[] // admin actions taken by this user
+  auditLogs   AuditLog[]
+  devices     Device[]
 }
 
 model Passenger {
@@ -113,7 +114,6 @@ model Passenger {
   strikes       Strike[]
   devices       Device[]
   notificationPreferences NotificationPreference?
-  emergencyEvents EmergencyEvent[] // as reporter
 }
 
 model Driver {
@@ -156,7 +156,6 @@ model Driver {
   points            DriverPoints[]
   devices           Device[]
   notificationPreferences NotificationPreference?
-  emergencyEvents   EmergencyEvent[] // as responder
 }
 
 model Subscription {
@@ -256,7 +255,7 @@ model Tip {
   paidAt      DateTime?
 
   ride        Ride     @relation(fields: [rideId], references: [id])
-  passenger   Passenger @relation(fields: [passengerId], references: [id])
+  passenger   Passenger @relation("TipFrom", fields: [passengerId], references: [id])
 }
 
 // Reviews
