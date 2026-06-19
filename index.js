@@ -18,6 +18,43 @@ function run(cmd, cwd, env = {}) {
   });
 }
 
+function backgroundDbSetup() {
+  const hasPrismaClient = fs.existsSync(path.join(SERVER_DIR, 'node_modules', '.prisma')) ||
+                          fs.existsSync(path.join(REPO_ROOT, 'node_modules', '.prisma'));
+  if (!hasPrismaClient) {
+    console.log('[TriQ] Prisma client not found. Skipping background DB setup.');
+    return;
+  }
+
+  console.log('[TriQ] [Background] Deploying database migrations...');
+  let migrateOk = false;
+  try {
+    run('npx prisma migrate deploy', SERVER_DIR);
+    migrateOk = true;
+    console.log('[TriQ] [Background] Migrations applied.');
+  } catch {
+    console.log('[TriQ] [Background] Migrate deploy failed. Will try db push...');
+  }
+
+  if (!migrateOk) {
+    console.log('[TriQ] [Background] Pushing schema to database...');
+    try {
+      run('npx prisma db push --accept-data-loss', SERVER_DIR);
+      console.log('[TriQ] [Background] Schema pushed successfully.');
+    } catch {
+      console.log('[TriQ] [Background] DB push failed or already up to date.');
+    }
+  }
+
+  console.log('[TriQ] [Background] Seeding database...');
+  try {
+    run('npx tsx prisma/seed.ts', SERVER_DIR);
+    console.log('[TriQ] [Background] Seed complete.');
+  } catch {
+    console.log('[TriQ] [Background] Seed skipped or failed.');
+  }
+}
+
 function runSilent(cmd, cwd) {
   try {
     return execSync(cmd, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
@@ -53,45 +90,14 @@ async function start() {
     }
   }
 
-  // ====== ALWAYS RUN MIGRATE + SEED (idempotent) ======
-  const hasPrismaClient = fs.existsSync(path.join(SERVER_DIR, 'node_modules', '.prisma')) ||
-                          fs.existsSync(path.join(REPO_ROOT, 'node_modules', '.prisma'));
-  if (hasPrismaClient) {
-    // Try migrate deploy first (for production with migration files)
-    console.log('[TriQ] Deploying database migrations...');
-    let migrateOk = false;
-    try {
-      run('npx prisma migrate deploy', SERVER_DIR);
-      migrateOk = true;
-    } catch {
-      console.log('[TriQ] Migrate deploy failed. Will try db push...');
-    }
-
-    // If no migrations exist, use db push to create tables from schema
-    if (!migrateOk) {
-      console.log('[TriQ] Pushing schema to database (initial setup)...');
-      try {
-        run('npx prisma db push --accept-data-loss', SERVER_DIR);
-        console.log('[TriQ] Schema pushed successfully.');
-      } catch {
-        console.log('[TriQ] DB push failed or already up to date, continuing...');
-      }
-    }
-
-    // Seed database (idempotent via upsert)
-    console.log('[TriQ] Seeding database...');
-    try { run('npx tsx prisma/seed.ts', SERVER_DIR); } catch {
-      console.log('[TriQ] Seed skipped or failed, continuing...');
-    }
-  } else {
-    console.log('[TriQ] Prisma client not found. Skipping migrate/seed (will run after build).');
-  }
-
   // ====== FAST PATH: pre-built dist exists ======
   if (fs.existsSync(DIST_FILE)) {
     console.log('[TriQ] Using pre-built dist.');
     require(DIST_FILE);
     console.log('[TriQ] ✅ Server and APIs are up and running!');
+
+    // Run DB setup in background so HidenCloud doesn't timeout during startup
+    setTimeout(() => backgroundDbSetup(), 2000);
     return;
   }
 
