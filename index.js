@@ -18,14 +18,51 @@ function run(cmd, cwd, env = {}) {
   });
 }
 
+function runSilent(cmd, cwd) {
+  try {
+    return execSync(cmd, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  } catch {
+    return null;
+  }
+}
+
 async function start() {
-  // Fast path: pre-built dist exists
+  // ====== GIT CLEANUP & AUTO-UPDATE (first thing) ======
+  if (fs.existsSync(path.join(REPO_ROOT, '.git'))) {
+    console.log('[TriQ] Git repo detected. Cleaning local changes...');
+
+    // Stash any local changes (including index.js edits by HidenCloud staff)
+    try {
+      run('git stash --include-untracked', REPO_ROOT);
+      console.log('[TriQ] Local changes stashed.');
+    } catch {
+      console.log('[TriQ] Nothing to stash or stash failed, continuing...');
+    }
+
+    // Pull latest
+    try {
+      run('git pull', REPO_ROOT);
+      console.log('[TriQ] Git pull complete.');
+    } catch {
+      console.log('[TriQ] Git pull failed, continuing with current code...');
+    }
+
+    // Check if dist exists after pull (newer pre-built dist)
+    if (fs.existsSync(DIST_FILE)) {
+      console.log('[TriQ] Pre-built dist found after update. Using it.');
+      require(DIST_FILE);
+      return;
+    }
+  }
+
+  // ====== FAST PATH: pre-built dist exists ======
   if (fs.existsSync(DIST_FILE)) {
     console.log('[TriQ] Using pre-built dist.');
     require(DIST_FILE);
     return;
   }
 
+  // ====== BUILD FLOW ======
   // Prevent duplicate builds if HidenCloud restarts during build
   if (fs.existsSync(BUILD_LOCK)) {
     console.log('[TriQ] Build already in progress (lock file exists). Waiting...');
