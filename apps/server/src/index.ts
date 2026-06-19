@@ -44,7 +44,20 @@ export const prisma = new PrismaClient({
 app.set('trust proxy', 1);
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://www.google.com", "https://www.gstatic.com", "https://*.firebaseio.com", "https://*.googleapis.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://*.firebaseio.com", "https://*.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"],
+      frameSrc: ["'self'", "https://www.google.com"],
+      childSrc: ["'self'", "blob:"],
+    },
+  },
+}));
 app.use(cors({
   origin: process.env.WEB_APP_URL || 'http://localhost:5173',
   credentials: true,

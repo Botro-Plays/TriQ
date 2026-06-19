@@ -93,7 +93,7 @@ export default function Login() {
         <p className="text-gray-400 mt-2">Tricycle Booking for Digos City</p>
       </div>
 
-      <div id="recaptcha-container" className="hidden" />
+      <div id="recaptcha-container" style={{ position: 'absolute', top: -9999, left: -9999, opacity: 0 }} />
 
       {step === 'phone' && (
         <div className="w-full max-w-sm space-y-4">
