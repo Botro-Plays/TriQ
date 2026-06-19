@@ -5,6 +5,7 @@ const path = require('path');
 const REPO_ROOT = __dirname;
 const SERVER_DIR = path.join(REPO_ROOT, 'apps', 'server');
 const WEB_DIR = path.join(REPO_ROOT, 'apps', 'web');
+const WEB_DIST_DIR = path.join(WEB_DIR, 'dist');
 const DIST_FILE = path.join(SERVER_DIR, 'dist', 'index.js');
 const ENV_FILE = path.join(SERVER_DIR, '.env');
 const ENV_EXAMPLE = path.join(SERVER_DIR, '.env.example');
@@ -57,6 +58,26 @@ function isSourceNewerThanDist() {
   if (!fs.existsSync(DIST_FILE)) return true;
   const distMtime = fs.statSync(DIST_FILE).mtimeMs;
   const srcDir = path.join(SERVER_DIR, 'src');
+  if (!fs.existsSync(srcDir)) return false;
+
+  function checkDir(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (checkDir(fullPath)) return true;
+      } else if (entry.isFile() && fs.statSync(fullPath).mtimeMs > distMtime) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return checkDir(srcDir);
+}
+
+function isWebSourceNewerThanDist() {
+  if (!fs.existsSync(WEB_DIST_DIR)) return true;
+  const distMtime = fs.statSync(WEB_DIST_DIR).mtimeMs;
+  const srcDir = path.join(WEB_DIR, 'src');
   if (!fs.existsSync(srcDir)) return false;
 
   function checkDir(dir) {
@@ -134,9 +155,11 @@ async function start() {
     // Run DB setup in background so HidenCloud doesn't timeout during startup
     setTimeout(() => backgroundDbSetup(), 2000);
 
-    // Build web app in background if not already built
-    const webDistPath = path.join(WEB_DIR, 'dist');
-    if (!fs.existsSync(webDistPath)) {
+    // Build web app in background if not built or source changed
+    if (!fs.existsSync(WEB_DIST_DIR) || isWebSourceNewerThanDist()) {
+      if (fs.existsSync(WEB_DIST_DIR) && isWebSourceNewerThanDist()) {
+        console.log('[TriQ] Web source changed since last build. Rebuilding...');
+      }
       setTimeout(() => {
         console.log('[TriQ] [Background] Building web app...');
         try {
