@@ -85,14 +85,12 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             # Deploy frontend
-            sudo rm -rf /var/www/triq/*
-            sudo tar -xzf /tmp/deploy-web.tar.gz -C /var/www/triq --strip-components=1
-            sudo chown -R triq:triq /var/www/triq
+            rm -rf /var/www/triq/*
+            tar -xzf /tmp/deploy-web.tar.gz -C /var/www/triq --strip-components=1
 
             # Deploy backend
-            sudo rm -rf /var/www/triq-server/*
-            sudo tar -xzf /tmp/deploy-server.tar.gz -C /var/www/triq-server --strip-components=1
-            sudo chown -R triq:triq /var/www/triq-server
+            rm -rf /var/www/triq-server/*
+            tar -xzf /tmp/deploy-server.tar.gz -C /var/www/triq-server --strip-components=1
 
             # Install dependencies and start server
             cd /var/www/triq-server
