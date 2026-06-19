@@ -92,6 +92,12 @@ async function start() {
 
   // ====== FAST PATH: pre-built dist exists ======
   if (fs.existsSync(DIST_FILE)) {
+    // Generate Prisma client first (server code imports it)
+    console.log('[TriQ] Generating Prisma client...');
+    try { run('npx prisma generate', SERVER_DIR); } catch {
+      console.log('[TriQ] Prisma generate failed, attempting to continue...');
+    }
+
     console.log('[TriQ] Using pre-built dist.');
     require(DIST_FILE);
     console.log('[TriQ] ✅ Server and APIs are up and running!');
