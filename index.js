@@ -75,23 +75,40 @@ function isSourceNewerThanDist() {
 }
 
 function isWebSourceNewerThanDist() {
-  if (!fs.existsSync(WEB_DIST_DIR)) return true;
+  if (!fs.existsSync(WEB_DIST_DIR)) {
+    console.log('[TriQ] Web dist does not exist, rebuild needed.');
+    return true;
+  }
   const distMtime = fs.statSync(WEB_DIST_DIR).mtimeMs;
+  const distMtimeStr = new Date(distMtime).toISOString();
   const srcDir = path.join(WEB_DIR, 'src');
-  if (!fs.existsSync(srcDir)) return false;
+  if (!fs.existsSync(srcDir)) {
+    console.log('[TriQ] Web src dir missing, skipping web rebuild check.');
+    return false;
+  }
+
+  let newestFile = { path: '', mtime: 0 };
 
   function checkDir(dir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (checkDir(fullPath)) return true;
-      } else if (entry.isFile() && fs.statSync(fullPath).mtimeMs > distMtime) {
-        return true;
+      } else if (entry.isFile()) {
+        const mtime = fs.statSync(fullPath).mtimeMs;
+        if (mtime > newestFile.mtime) {
+          newestFile = { path: fullPath, mtime };
+        }
+        if (mtime > distMtime) {
+          return true;
+        }
       }
     }
     return false;
   }
-  return checkDir(srcDir);
+  const result = checkDir(srcDir);
+  console.log(`[TriQ] Web dist mtime: ${distMtimeStr}, newest src: ${newestFile.path} (${new Date(newestFile.mtime).toISOString()}), rebuild needed: ${result}`);
+  return result;
 }
 
 function runSilent(cmd, cwd) {
