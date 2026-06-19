@@ -12,4 +12,8 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+
+// Disable app verification for testing (test phone numbers bypass real SMS)
+auth.settings.appVerificationDisabledForTesting = true;
+
 export { RecaptchaVerifier };
