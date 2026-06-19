@@ -4,6 +4,7 @@ const path = require('path');
 
 const REPO_ROOT = __dirname;
 const SERVER_DIR = path.join(REPO_ROOT, 'apps', 'server');
+const WEB_DIR = path.join(REPO_ROOT, 'apps', 'web');
 const DIST_FILE = path.join(SERVER_DIR, 'dist', 'index.js');
 const ENV_FILE = path.join(SERVER_DIR, '.env');
 const ENV_EXAMPLE = path.join(SERVER_DIR, '.env.example');
@@ -101,6 +102,21 @@ async function start() {
 
     // Run DB setup in background so HidenCloud doesn't timeout during startup
     setTimeout(() => backgroundDbSetup(), 2000);
+
+    // Build web app in background if not already built
+    const webDistPath = path.join(WEB_DIR, 'dist');
+    if (!fs.existsSync(webDistPath)) {
+      setTimeout(() => {
+        console.log('[TriQ] [Background] Building web app...');
+        try {
+          run('npm run build -w apps/web', REPO_ROOT);
+          console.log('[TriQ] [Background] Web app built.');
+        } catch {
+          console.log('[TriQ] [Background] Web build failed.');
+        }
+      }, 3000);
+    }
+
     return;
   }
 
@@ -157,8 +173,14 @@ async function start() {
     console.log('[TriQ] Seeding database...');
     run('npx tsx prisma/seed.ts', SERVER_DIR);
 
-    // 7. Compile TypeScript
-    console.log('[TriQ] Building TypeScript...');
+    // 7. Build web PWA
+    console.log('[TriQ] Building web app...');
+    try { run('npm run build -w apps/web', REPO_ROOT); } catch {
+      console.log('[TriQ] Web build failed or not configured, continuing...');
+    }
+
+    // 8. Compile server TypeScript
+    console.log('[TriQ] Building server TypeScript...');
     run('npm run build', SERVER_DIR);
 
     // 8. Verify dist was created

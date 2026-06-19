@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -76,10 +77,21 @@ setupSocketHandlers(io, prisma);
 // Error handling (must be last)
 app.use(errorHandler);
 
-// 404 handler
-app.use((_req, res) => {
-  res.status(404).json({ error: 'Not Found', message: 'The requested resource does not exist' });
-});
+// Serve built web app (PWA) static files
+const webDistPath = path.resolve(__dirname, '../../web/dist');
+if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
+  app.use(express.static(webDistPath));
+
+  // React Router catch-all: serve index.html for non-API routes
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(webDistPath, 'index.html'));
+  });
+} else {
+  // 404 handler (dev mode or web not built yet)
+  app.use((_req, res) => {
+    res.status(404).json({ error: 'Not Found', message: 'The requested resource does not exist' });
+  });
+}
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 
@@ -87,6 +99,12 @@ httpServer.listen(PORT, () => {
   console.log(`🛺 TriQ Server running on port ${PORT}`);
   console.log(`📡 Socket.io ready`);
   console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'not configured'}`);
+  const webDistPath = path.resolve(__dirname, '../../web/dist');
+  if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
+    console.log(`🌐 Frontend PWA served at root /`);
+  } else {
+    console.log(`⚠️  Frontend PWA not built yet (run: npm run build -w apps/web)`);
+  }
 });
 
 // Graceful shutdown
