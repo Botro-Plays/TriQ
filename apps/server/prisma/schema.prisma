@@ -1,0 +1,522 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  PASSENGER
+  DRIVER
+  OWNER
+  STAFF
+}
+
+enum KycStatus {
+  UNVERIFIED
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum DriverStatus {
+  PENDING
+  VERIFIED
+  SUSPENDED
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum RideStatusEnum {
+  REQUESTED
+  ACCEPTED
+  COUNTER_OFFERED
+  COUNTER_OFFER_ACCEPTED
+  COUNTER_OFFER_REJECTED
+  COUNTER_OFFER_EXPIRED
+  ARRIVING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  GCASH
+  MAYA
+  CARD
+}
+
+enum DocumentType {
+  GOVT_ID
+  DRIVER_LICENSE
+  FRANCHISE_PERMIT
+  OR_CR
+  PASSENGER_SELFIE
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Core Models
+model User {
+  id          String   @id @default(uuid())
+  firebaseUid String   @unique
+  phoneNumber String   @unique
+  role        UserRole @default(PASSENGER)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  passenger   Passenger?
+  driver      Driver?
+  auditLogs   AuditLog[] // admin actions taken by this user
+}
+
+model Passenger {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  name          String
+  photoUrl      String?  @db.Text
+  homeLocation  String?  @db.Text
+  workLocation  String?  @db.Text
+  emergencyContact String?
+  kycStatus     KycStatus @default(UNVERIFIED)
+  kycReviewedAt DateTime?
+  kycReviewedBy String?
+  kycRejectionReason String? @db.Text
+  trustScore    Int      @default(100)
+  autoCancelledCount Int  @default(0)
+
+  user          User     @relation(fields: [userId], references: [id])
+  rides         Ride[]   @relation("PassengerRides")
+  savedPlaces   SavedPlace[]
+  platformTips  Tip[]    @relation("TipFrom")
+  reviewsGiven  Review[] @relation("ReviewFrom")
+  documents     Document[]
+  badges        PassengerBadge[]
+  points        PassengerPoints[]
+  strikes       Strike[]
+  devices       Device[]
+  notificationPreferences NotificationPreference?
+  emergencyEvents EmergencyEvent[] // as reporter
+}
+
+model Driver {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  name              String
+  photoUrl          String?  @db.Text
+  plateNumber       String   @unique
+  tricycleModel     String?
+  status            DriverStatus @default(PENDING)
+
+  currentLat        Float?
+  currentLng        Float?
+  isOnline          Boolean  @default(false)
+  lastOnlineAt      DateTime?
+
+  pickupRadius      Float    @default(2.0) // km
+  expandedRadiusUntil DateTime? // temporary expanded search radius
+
+  totalEarnings     Int      @default(0) // centavos
+  totalRides        Int      @default(0)
+  rating            Float    @default(5.0)
+  reviewCount       Int      @default(0)
+
+  kycStatus         KycStatus @default(PENDING_REVIEW)
+  kycReviewedAt     DateTime?
+  kycReviewedBy     String?
+  kycRejectionReason String? @db.Text
+
+  subscriptionTier  SubscriptionTier @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(ACTIVE)
+  subscriptionExpiresAt DateTime?
+
+  user              User          @relation(fields: [userId], references: [id])
+  rides             Ride[]        @relation("DriverRides")
+  documents         Document[]
+  subscriptions     Subscription[]
+  reviewsReceived   Review[]      @relation("ReviewTo")
+  badges            DriverBadge[]
+  points            DriverPoints[]
+  devices           Device[]
+  notificationPreferences NotificationPreference?
+  emergencyEvents   EmergencyEvent[] // as responder
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  driverId  String
+  tier      SubscriptionTier
+  status    SubscriptionStatus @default(ACTIVE)
+  isTrial   Boolean  @default(false)
+  trialEndsAt DateTime?
+  paymongoId String?
+  amount    Int
+  startedAt DateTime @default(now())
+  expiresAt DateTime
+  cancelledAt DateTime?
+
+  driver    Driver   @relation(fields: [driverId], references: [id])
+}
+
+model SavedPlace {
+  id          String   @id @default(uuid())
+  passengerId String
+  label       String   // "Home", "Work", "Market"
+  address     String  @db.Text
+  lat         Float
+  lng         Float
+  createdAt   DateTime @default(now())
+
+  passenger   Passenger @relation(fields: [passengerId], references: [id])
+}
+
+// Ride Models
+model Ride {
+  id            String   @id @default(uuid())
+  passengerId   String
+  driverId      String?
+
+  pickupLat     Float
+  pickupLng     Float
+  pickupAddress String  @db.Text
+  dropoffLat    Float
+  dropoffLng    Float
+  dropoffAddress String  @db.Text
+
+  status          RideStatusEnum @default(REQUESTED)
+  estimatedFare   Int      // in centavos
+  finalFare       Int?     // driver may optionally record actual cash
+
+  passengerCount  Int      @default(1)
+  hasSeniorCitizen Boolean @default(false)
+  hasStudent      Boolean  @default(false)
+  hasExtraBaggage Boolean  @default(false)
+
+  counterOfferedFare Int?
+  counterOfferStatus String?
+  counterOfferExpiresAt DateTime?
+  counterOfferDriverId String?
+  negotiatedFare  Int?
+
+  paymentMethod   PaymentMethod @default(CASH)
+
+  passenger       Passenger @relation("PassengerRides", fields: [passengerId], references: [id])
+  driver          Driver?   @relation("DriverRides", fields: [driverId], references: [id])
+  statusHistory   RideStatus[]
+  tip             Tip?
+  review          Review?
+  reports         Report[]
+  emergencyEvents EmergencyEvent[]
+  strike          Strike?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime?
+}
+
+model RideStatus {
+  id        String   @id @default(uuid())
+  rideId    String
+  status    RideStatusEnum
+  lat       Float?
+  lng       Float?
+  note      String?
+  actor     String   @default("USER") // USER, DRIVER, PASSENGER, SYSTEM
+  createdAt DateTime @default(now())
+
+  ride      Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+}
+
+// Financial
+model Tip {
+  id          String   @id @default(uuid())
+  rideId      String   @unique
+  passengerId String
+  amount      Int      // in centavos
+  paymongoId  String?
+  status      String   @default("PENDING") // PENDING, PAID, FAILED
+  createdAt   DateTime @default(now())
+  paidAt      DateTime?
+
+  ride        Ride     @relation(fields: [rideId], references: [id])
+  passenger   Passenger @relation(fields: [passengerId], references: [id])
+}
+
+// Reviews
+model Review {
+  id          String   @id @default(uuid())
+  rideId      String   @unique
+  fromPassengerId String
+  toDriverId  String
+  rating      Int      // 1–5
+  comment     String? @db.Text
+  thumbsUp    Boolean?
+  createdAt   DateTime @default(now())
+
+  ride        Ride     @relation(fields: [rideId], references: [id])
+  from        Passenger @relation("ReviewFrom", fields: [fromPassengerId], references: [id])
+  to          Driver   @relation("ReviewTo", fields: [toDriverId], references: [id])
+}
+
+// KYC Documents
+model Document {
+  id          String   @id @default(uuid())
+  passengerId String?
+  driverId    String?
+  type        DocumentType
+  url         String
+  status      DocumentStatus @default(PENDING)
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  rejectionReason String? @db.Text
+  createdAt   DateTime @default(now())
+
+  passenger   Passenger? @relation(fields: [passengerId], references: [id])
+  driver      Driver?  @relation(fields: [driverId], references: [id])
+}
+
+// Gamification
+model Badge {
+  id          String   @id @default(uuid())
+  code        String   @unique // e.g., "EARLY_BIRD", "5_STAR_STREAK"
+  name        String
+  description String
+  iconUrl     String?
+  targetRole  UserRole // PASSENGER or DRIVER
+  createdAt   DateTime @default(now())
+
+  driverBadges DriverBadge[]
+  passengerBadges PassengerBadge[]
+}
+
+model DriverBadge {
+  id        String   @id @default(uuid())
+  driverId  String
+  badgeId   String
+  awardedAt DateTime @default(now())
+
+  driver    Driver   @relation(fields: [driverId], references: [id])
+  badge     Badge    @relation(fields: [badgeId], references: [id])
+
+  @@unique([driverId, badgeId])
+}
+
+model PassengerBadge {
+  id          String   @id @default(uuid())
+  passengerId String
+  badgeId     String
+  awardedAt   DateTime @default(now())
+
+  passenger   Passenger @relation(fields: [passengerId], references: [id])
+  badge       Badge    @relation(fields: [badgeId], references: [id])
+
+  @@unique([passengerId, badgeId])
+}
+
+model DriverPoints {
+  id        String   @id @default(uuid())
+  driverId  String
+  points    Int
+  reason    String   // e.g., "COMPLETED_RIDE", "5_STAR_RATING"
+  rideId    String?
+  createdAt DateTime @default(now())
+
+  driver    Driver   @relation(fields: [driverId], references: [id])
+}
+
+model PassengerPoints {
+  id          String   @id @default(uuid())
+  passengerId String
+  points      Int
+  reason      String
+  rideId      String?
+  createdAt   DateTime @default(now())
+
+  passenger   Passenger @relation(fields: [passengerId], references: [id])
+}
+
+model SeasonalChallenge {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  startDate   DateTime
+  endDate     DateTime
+  targetRole  UserRole
+  condition   String   // e.g., "COMPLETE_10_RIDES"
+  rewardBadgeId String?
+  rewardPoints Int?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+// Reports
+model Report {
+  id          String   @id @default(uuid())
+  rideId      String
+  reporterRole UserRole // PASSENGER or DRIVER
+  reportedRole UserRole
+  reporterId  String   // passenger or driver user ID
+  reportedId  String   // passenger or driver user ID
+  category    String
+  severity    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  description String? @db.Text
+  status      String   @default("PENDING") // PENDING, UNDER_REVIEW, RESOLVED, DISMISSED
+  resolution  String? @db.Text
+  resolvedBy  String?
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  ride        Ride     @relation(fields: [rideId], references: [id])
+  attachments ReportAttachment[]
+}
+
+model ReportAttachment {
+  id          String   @id @default(uuid())
+  reportId    String
+  url         String
+  mimeType    String
+  createdAt   DateTime @default(now())
+
+  report      Report   @relation(fields: [reportId], references: [id])
+}
+
+// NEW: Strike (Fake Ride Protection)
+model Strike {
+  id          String   @id @default(uuid())
+  passengerId String
+  rideId      String   @unique
+  reason      String   // NO_SHOW, ABUSIVE_BEHAVIOR, LATE_CANCELLATION
+  issuedBy    String   // SYSTEM or admin userId
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime? // auto-expire after 30 days
+
+  passenger   Passenger @relation(fields: [passengerId], references: [id])
+  ride        Ride     @relation(fields: [rideId], references: [id])
+}
+
+// NEW: Audit Log (Admin Accountability)
+model AuditLog {
+  id          String   @id @default(uuid())
+  adminId     String
+  action      String   // IMPERSONATION_START, KYC_APPROVE, DRIVER_SUSPEND, etc.
+  targetType  String   // PASSENGER, DRIVER, RIDE, REPORT, etc.
+  targetId    String
+  reason      String?
+  metadata    Json?    // flexible context
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  admin       User     @relation(fields: [adminId], references: [id])
+}
+
+// NEW: City & Fare Rates (Multi-city support)
+model City {
+  id          String   @id @default(uuid())
+  name        String   // "Digos City"
+  country     String   // "Philippines"
+  province    String   // "Davao del Sur"
+  lat         Float    // city center latitude
+  lng         Float    // city center longitude
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  fareRates   FareRate[]
+}
+
+model FareRate {
+  id          String   @id @default(uuid())
+  cityId      String
+  baseFare    Int      // in centavos (e.g., 1600 for ₱16)
+  perKmRate   Int      // in centavos (e.g., 1000 for ₱10)
+  maxDistance Int      // in km
+  minDistance Int      // in km
+  effectiveFrom DateTime @default(now())
+  effectiveUntil DateTime?
+
+  city        City     @relation(fields: [cityId], references: [id])
+}
+
+// NEW: System Config (Feature Flags)
+model SystemConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+}
+
+// NEW: Emergency Event
+model EmergencyEvent {
+  id          String   @id @default(uuid())
+  rideId      String
+  reporterId  String   // passenger userId
+  responderId String?  // driver userId (if during ride)
+  lat         Float?
+  lng         Float?
+  alertType   String   // ADMIN_EMAIL, ADMIN_SMS, EMERGENCY_CONTACT
+  status      String   @default("ACTIVE") // ACTIVE, RESOLVED, FALSE_ALARM
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  notes       String? @db.Text
+  createdAt   DateTime @default(now())
+
+  ride        Ride     @relation(fields: [rideId], references: [id])
+}
+
+// NEW: Device (Fraud Detection)
+model Device {
+  id          String   @id @default(uuid())
+  userId      String
+  passengerId String?
+  driverId    String?
+  fingerprint String   @unique // device fingerprint hash
+  brand       String?
+  model       String?
+  os          String?  // Android 14, iOS 17
+  appVersion  String?
+  lastSeenAt  DateTime @updatedAt
+  isTrusted   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+  passenger   Passenger? @relation(fields: [passengerId], references: [id])
+  driver      Driver?  @relation(fields: [driverId], references: [id])
+}
+
+// NEW: Notification Preferences
+model NotificationPreference {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  passengerId       String?  @unique
+  driverId          String?  @unique
+  pushEnabled       Boolean  @default(true)
+  smsEnabled        Boolean  @default(true)
+  emailEnabled      Boolean  @default(false)
+  marketingEnabled  Boolean  @default(true)
+  rideUpdatesEnabled Boolean @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  passenger         Passenger? @relation(fields: [passengerId], references: [id])
+  driver            Driver?  @relation(fields: [driverId], references: [id])
+}
