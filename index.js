@@ -49,10 +49,26 @@ async function start() {
 
     // Check if dist exists after pull (newer pre-built dist)
     if (fs.existsSync(DIST_FILE)) {
-      console.log('[TriQ] Pre-built dist found after update. Using it.');
-      require(DIST_FILE);
-      return;
+      console.log('[TriQ] Pre-built dist found after update.');
     }
+  }
+
+  // ====== ALWAYS RUN MIGRATE + SEED (idempotent) ======
+  // These are safe to run every time; they create/update tables and seed data
+  const hasPrismaClient = fs.existsSync(path.join(SERVER_DIR, 'node_modules', '.prisma')) ||
+                          fs.existsSync(path.join(REPO_ROOT, 'node_modules', '.prisma'));
+  if (hasPrismaClient) {
+    console.log('[TriQ] Deploying database migrations...');
+    try { run('npx prisma migrate deploy', SERVER_DIR); } catch {
+      console.log('[TriQ] Migrate deploy skipped or failed, continuing...');
+    }
+
+    console.log('[TriQ] Seeding database...');
+    try { run('npx tsx prisma/seed.ts', SERVER_DIR); } catch {
+      console.log('[TriQ] Seed skipped or failed, continuing...');
+    }
+  } else {
+    console.log('[TriQ] Prisma client not found. Skipping migrate/seed (will run after build).');
   }
 
   // ====== FAST PATH: pre-built dist exists ======
