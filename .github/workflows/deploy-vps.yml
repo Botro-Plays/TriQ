@@ -66,7 +66,7 @@ jobs:
       - name: Package backend
         run: |
           cd apps/server
-          tar -czf ../../deploy-server.tar.gz dist/ prisma/ package.json
+          tar -czf ../../deploy-server.tar.gz dist/ prisma/ package.json prisma/migrations/
 
       - name: Upload packages to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -97,8 +97,8 @@ jobs:
             cd /var/www/triq-server
             npm install --production --omit=dev
             ./node_modules/.bin/prisma generate
-            ./node_modules/.bin/prisma migrate deploy || true
-            ./node_modules/.bin/prisma db seed || true
+            ./node_modules/.bin/prisma migrate deploy
+            ./node_modules/.bin/prisma db seed
 
             # Start/restart PM2
             pm2 delete triq-server || true
