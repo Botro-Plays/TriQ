@@ -50,11 +50,19 @@ async function start() {
   console.log('[TriQ] Generating Prisma client...');
   run('npx prisma generate', SERVER_DIR);
 
-  // 5. Compile TypeScript
+  // 5. Deploy database migrations (idempotent)
+  console.log('[TriQ] Deploying database migrations...');
+  run('npx prisma migrate deploy', SERVER_DIR);
+
+  // 6. Seed database (idempotent via upsert)
+  console.log('[TriQ] Seeding database...');
+  run('npx prisma db seed', SERVER_DIR);
+
+  // 7. Compile TypeScript
   console.log('[TriQ] Building TypeScript...');
   run('npm run build', SERVER_DIR);
 
-  // 6. Verify dist was created
+  // 8. Verify dist was created
   if (!fs.existsSync(DIST_FILE)) {
     console.error('[TriQ] Build completed but dist/index.js not found.');
     process.exit(1);
