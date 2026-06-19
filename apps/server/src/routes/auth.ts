@@ -25,16 +25,9 @@ router.post('/verify-token', async (req, res) => {
       phoneNumber = firebaseUser.phone_number!;
       firebaseUid = firebaseUser.uid;
     } catch (err: any) {
-      // Dev fallback: if Firebase Admin not configured, accept phone directly
       console.warn('Firebase token verification failed:', err.message);
-      if (req.body.phone) {
-        phoneNumber = req.body.phone;
-        firebaseUid = 'dev-' + phoneNumber.replace(/\D/g, '');
-        console.log('[DEV] Using phone fallback:', phoneNumber);
-      } else {
-        res.status(401).json({ error: 'Invalid token' });
-        return;
-      }
+      res.status(401).json({ error: 'Invalid token' });
+      return;
     }
 
     if (!phoneNumber) {

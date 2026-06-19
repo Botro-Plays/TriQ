@@ -118,12 +118,6 @@ export default function Login() {
           >
             {loading ? 'Sending...' : 'Send OTP'}
           </button>
-          <button
-            onClick={() => { (window as any).__pendingIdToken = 'dev-token'; setStep('role'); }}
-            className="w-full p-2 text-sm text-gray-500 hover:text-triq-cyan transition-colors"
-          >
-            Dev: skip phone verification
-          </button>
         </div>
       )}
 
