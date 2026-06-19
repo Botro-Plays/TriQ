@@ -75,6 +75,7 @@ async function start() {
   if (fs.existsSync(DIST_FILE)) {
     console.log('[TriQ] Using pre-built dist.');
     require(DIST_FILE);
+    console.log('[TriQ] ✅ Server and APIs are up and running!');
     return;
   }
 
@@ -143,6 +144,7 @@ async function start() {
 
     console.log('[TriQ] Build complete. Starting server...');
     require(DIST_FILE);
+    console.log('[TriQ] ✅ Server and APIs are up and running!');
   } catch (err) {
     console.error('[TriQ] Build failed:', err.message);
     // Keep process alive briefly so HidenCloud logs the error
