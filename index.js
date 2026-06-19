@@ -53,6 +53,26 @@ function backgroundDbSetup() {
   }
 }
 
+function isSourceNewerThanDist() {
+  if (!fs.existsSync(DIST_FILE)) return true;
+  const distMtime = fs.statSync(DIST_FILE).mtimeMs;
+  const srcDir = path.join(SERVER_DIR, 'src');
+  if (!fs.existsSync(srcDir)) return false;
+
+  function checkDir(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (checkDir(fullPath)) return true;
+      } else if (entry.isFile() && fs.statSync(fullPath).mtimeMs > distMtime) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return checkDir(srcDir);
+}
+
 function runSilent(cmd, cwd) {
   try {
     return execSync(cmd, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
@@ -85,6 +105,17 @@ async function start() {
     // Check if dist exists after pull (newer pre-built dist)
     if (fs.existsSync(DIST_FILE)) {
       console.log('[TriQ] Pre-built dist found after update.');
+    }
+  }
+
+  // ====== CHECK IF REBUILD IS NEEDED ======
+  if (fs.existsSync(DIST_FILE) && isSourceNewerThanDist()) {
+    console.log('[TriQ] Server source changed since last build. Rebuilding...');
+    try {
+      fs.rmSync(path.join(SERVER_DIR, 'dist'), { recursive: true, force: true });
+      console.log('[TriQ] Old dist removed.');
+    } catch {
+      console.log('[TriQ] Could not remove old dist, continuing...');
     }
   }
 
