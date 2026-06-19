@@ -38,9 +38,14 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      setupRecaptcha();
       const formatted = phone.startsWith('+') ? phone : '+63' + phone.replace(/^0/, '');
-      confirmationRef.current = await signInWithPhoneNumber(auth, formatted, recaptchaRef.current!);
+      // Test mode: no reCAPTCHA needed for test numbers
+      if (auth.settings.appVerificationDisabledForTesting) {
+        confirmationRef.current = await (signInWithPhoneNumber as any)(auth, formatted, undefined);
+      } else {
+        setupRecaptcha();
+        confirmationRef.current = await signInWithPhoneNumber(auth, formatted, recaptchaRef.current!);
+      }
       setStep('otp');
     } catch (err: any) {
       setError(err.message || 'Failed to send OTP');
