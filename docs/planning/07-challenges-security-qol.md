@@ -301,7 +301,45 @@ GET /health/ready   → Kubernetes-style readiness probe
 
 ---
 
-## 8. Risk Matrix
+## 8. Firebase Phone Auth & Carrier-Specific OTP Issues
+
+### DITO Telecommunity Users Not Receiving OTPs
+
+**Context**: DITO is a newer Philippine telco. Their international SMS gateway routing with Google Firebase is less mature than Globe or Smart, causing intermittent OTP delivery failures.
+
+**User-Facing Troubleshooting Steps**:
+
+1. **Check Device Spam Filters**
+   - Android: Open default Messaging app → Menu → Spam & Blocked folder
+   - Ensure Firebase sender hasn't been accidentally blacklisted
+
+2. **Verify Number Formatting**
+   - Use international format: `+6391xxxxxxxx`
+   - Do NOT use `09` prefix or `+639` without full digits
+
+3. **Toggle Airplane Mode**
+   - Turn on Airplane Mode for 10–15 seconds, then turn off
+   - Forces DITO SIM to re-register with the nearest cell tower
+
+4. **Wait Before Resending**
+   - DITO's international gateway occasionally experiences congestion
+   - Wait 2–3 minutes before clicking Resend to avoid rate limits
+
+5. **Use Voice Call Verification**
+   - If available, select "Call Me" option
+   - Google will call the DITO number and recite the code verbally
+
+**Developer-Side Mitigations**:
+
+- **Whitelist affected numbers**: Add known DITO numbers to Firebase Console → Authentication → Phone numbers for testing
+- **Lower reCAPTCHA SMS defense threshold**: Settings → 0.3 (Block fewer) instead of 0.5
+- **Contact Firebase Support**: Request DITO carrier whitelisting for project `triq-35908`
+- **SHA fingerprints**: Ensure app SHA-1/SHA-256 are registered in Firebase Console → Project Settings
+- **Monitor SMS quota**: Check Google Cloud Console for Phone Authentication daily limits
+
+---
+
+## 9. Risk Matrix
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
