@@ -54,15 +54,31 @@ async function start() {
   }
 
   // ====== ALWAYS RUN MIGRATE + SEED (idempotent) ======
-  // These are safe to run every time; they create/update tables and seed data
   const hasPrismaClient = fs.existsSync(path.join(SERVER_DIR, 'node_modules', '.prisma')) ||
                           fs.existsSync(path.join(REPO_ROOT, 'node_modules', '.prisma'));
   if (hasPrismaClient) {
+    // Try migrate deploy first (for production with migration files)
     console.log('[TriQ] Deploying database migrations...');
-    try { run('npx prisma migrate deploy', SERVER_DIR); } catch {
-      console.log('[TriQ] Migrate deploy skipped or failed, continuing...');
+    let migrateOk = false;
+    try {
+      run('npx prisma migrate deploy', SERVER_DIR);
+      migrateOk = true;
+    } catch {
+      console.log('[TriQ] Migrate deploy failed. Will try db push...');
     }
 
+    // If no migrations exist, use db push to create tables from schema
+    if (!migrateOk) {
+      console.log('[TriQ] Pushing schema to database (initial setup)...');
+      try {
+        run('npx prisma db push --accept-data-loss', SERVER_DIR);
+        console.log('[TriQ] Schema pushed successfully.');
+      } catch {
+        console.log('[TriQ] DB push failed or already up to date, continuing...');
+      }
+    }
+
+    // Seed database (idempotent via upsert)
     console.log('[TriQ] Seeding database...');
     try { run('npx tsx prisma/seed.ts', SERVER_DIR); } catch {
       console.log('[TriQ] Seed skipped or failed, continuing...');
