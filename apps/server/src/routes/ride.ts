@@ -142,7 +142,7 @@ router.get('/active', async (req, res) => {
       where,
       orderBy: { createdAt: 'desc' },
       include: {
-        passenger: { select: { id: true, name: true, photoUrl: true, phoneNumber: true } },
+        passenger: { select: { id: true, name: true, photoUrl: true, user: { select: { phoneNumber: true } } } },
         driver: { select: { id: true, name: true, plateNumber: true, tricycleModel: true, photoUrl: true, rating: true, currentLat: true, currentLng: true } },
       },
     });
@@ -159,7 +159,7 @@ router.get('/:id', async (req, res) => {
     const ride = await prisma.ride.findUnique({
       where: { id: req.params.id },
       include: {
-        passenger: { select: { id: true, name: true, photoUrl: true, phoneNumber: true } },
+        passenger: { select: { id: true, name: true, photoUrl: true, user: { select: { phoneNumber: true } } } },
         driver: { select: { id: true, name: true, plateNumber: true, tricycleModel: true, photoUrl: true, rating: true, currentLat: true, currentLng: true } },
         statusHistory: { orderBy: { createdAt: 'asc' } },
       },
@@ -197,7 +197,7 @@ router.post('/:id/accept', async (req, res) => {
       where: { id: ride.id },
       data: { status: 'ACCEPTED', driverId },
       include: {
-        passenger: { select: { id: true, name: true, phoneNumber: true } },
+        passenger: { select: { id: true, name: true, user: { select: { phoneNumber: true } } } },
         driver: { select: { id: true, name: true, plateNumber: true, tricycleModel: true, rating: true } },
       },
     });
@@ -485,9 +485,11 @@ router.post('/:id/emergency', async (req, res) => {
     const event = await prisma.emergencyEvent.create({
       data: {
         rideId: ride.id,
+        reporterId: ride.passengerId,
         lat: lat || null,
         lng: lng || null,
-        description: description || 'Emergency triggered',
+        alertType: 'ADMIN_EMAIL',
+        notes: description || 'Emergency triggered',
       },
     });
 

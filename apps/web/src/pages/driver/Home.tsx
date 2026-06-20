@@ -28,7 +28,7 @@ interface ActiveRide {
   pickupAddress: string;
   dropoffAddress: string;
   estimatedFare: number;
-  passenger: { id: string; name: string; phoneNumber: string };
+  passenger: { id: string; name: string; user: { phoneNumber: string } };
 }
 
 export default function DriverHome() {
@@ -251,7 +251,7 @@ export default function DriverHome() {
             </div>
             <div className="flex-1">
               <p className="text-white font-semibold text-sm">{activeRide.passenger.name}</p>
-              <p className="text-gray-400 text-xs">{activeRide.passenger.phoneNumber}</p>
+              <p className="text-gray-400 text-xs">{activeRide.passenger.user.phoneNumber}</p>
             </div>
             <span className="text-triq-yellow font-bold">₱{(activeRide.estimatedFare / 100).toFixed(0)}</span>
           </div>

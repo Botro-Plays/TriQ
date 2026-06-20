@@ -11,7 +11,7 @@ interface Driver {
   totalRides: number;
   kycStatus: string;
   subscriptionTier: string;
-  createdAt: string;
+  lastOnlineAt: string | null;
 }
 
 export default function AdminDrivers() {

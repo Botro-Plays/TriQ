@@ -144,13 +144,13 @@ router.get('/drivers', async (req, res) => {
     const [drivers, total] = await Promise.all([
       prisma.driver.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { lastOnlineAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
         select: {
           id: true, name: true, plateNumber: true, status: true, isOnline: true,
           rating: true, totalRides: true, kycStatus: true, subscriptionTier: true,
-          createdAt: true,
+          lastOnlineAt: true,
         },
       }),
       prisma.driver.count({ where }),
