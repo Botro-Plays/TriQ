@@ -178,7 +178,7 @@ export default function Login() {
     <div className="min-h-screen bg-triq-dark flex flex-col items-center justify-center px-5 py-8">
       {/* Logo + Branding */}
       <div className="flex flex-col items-center mb-8">
-        <TriQLogo className="w-20 h-20 mb-4 animate-pulse" />
+        <TriQLogo className="w-[120px] h-[120px] mb-4 animate-pulse" />
         <h1 className="text-5xl font-extrabold tracking-tight">
           <span className="text-triq-yellow">Tri</span>
           <span className="text-triq-cyan">Q</span>
