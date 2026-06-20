@@ -1,10 +1,13 @@
 import dotenv from 'dotenv';
+import path from 'path';
 // Load environment variables FIRST — before any imports that create PrismaClient
-const envPath = process.env.NODE_ENV === 'production' ? '.env' : '.env.local';
+// Use __dirname so it works regardless of CWD (PM2 sets CWD to dist/)
+const envPath = process.env.NODE_ENV === 'production'
+  ? path.resolve(__dirname, '..', '.env')
+  : path.resolve(__dirname, '..', '..', '.env.local');
 dotenv.config({ path: envPath });
 
 import express from 'express';
-import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
