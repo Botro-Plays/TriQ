@@ -581,3 +581,16 @@ ALTER TABLE "NotificationPreference" ADD CONSTRAINT "NotificationPreference_pass
 -- AddForeignKey
 ALTER TABLE "NotificationPreference" ADD CONSTRAINT "NotificationPreference_driverId_fkey" FOREIGN KEY ("driverId") REFERENCES "Driver"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+-- Prisma migration tracking
+CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
+    "id" VARCHAR(36) NOT NULL,
+    "checksum" VARCHAR(64) NOT NULL,
+    "finished_at" TIMESTAMPTZ,
+    "migration_name" VARCHAR(255) NOT NULL,
+    "logs" TEXT,
+    "rolled_back_at" TIMESTAMPTZ,
+    "started_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "applied_steps_count" INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO "_prisma_migrations" ("id", "checksum", "migration_name", "finished_at", "applied_steps_count") VALUES (gen_random_uuid(), 'manual-init', '20260620000000_init', NOW(), 1);
+
