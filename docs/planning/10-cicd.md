@@ -1,4 +1,4 @@
-# TriQ — CI/CD Pipeline & Deployment
+# TriQ — CI/CD Pipeline & Deployment (Actual)
 
 ## Git Repository Structure
 
@@ -6,161 +6,159 @@
 TriQ-Project-New/
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml          # Lint, typecheck, unit tests
-│       ├── integration.yml # Integration tests with DB
-│       └── deploy.yml      # Deploy to VPS
+│       ├── ci.yml              # Build verification (lint + typecheck)
+│       └── deploy-vps.yml      # Build, package, deploy to VPS
 ├── apps/
-│   ├── passenger-mobile/   # React Native (Expo)
-│   ├── driver-mobile/      # React Native (Expo)
-│   ├── web-passenger/      # React + Vite PWA
-│   ├── web-admin/          # React + Vite Dashboard
-│   └── landing-page/       # React + Vite (or plain HTML)
-├── backend/                # Node.js + Express + TypeScript
-│   ├── src/
-│   ├── tests/
-│   └── prisma/
-├── packages/
-│   ├── shared-types/       # Shared TypeScript interfaces
-│   ├── shared-ui/          # Shared component primitives
-│   └── eslint-config/      # Shared ESLint config
-├── docker-compose.yml
-└── package.json            # Root workspace config
+│   ├── web/                    # React + Vite PWA (frontend)
+│   └── server/                 # Node.js + Express + TypeScript (backend)
+│       ├── src/
+│       ├── prisma/
+│       │   ├── schema.prisma
+│       │   ├── seed.ts
+│       │   └── migrations/     # Committed SQL migration files
+│       └── config/             # Firebase service account JSON (not in git)
+├── package.json                # Root workspace config
+└── README.md
 ```
 
 ---
 
 ## CI/CD Pipeline
 
-### GitHub Actions Workflow: CI (`.github/workflows/ci.yml`)
+### GitHub Actions Workflow: Build & Deploy (`.github/workflows/deploy-vps.yml`)
 
 ```yaml
-name: CI
-
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
-
-jobs:
-  lint-and-typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-
-  unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run test:unit -- --coverage
-      - uses: codecov/codecov-action@v3
-        with:
-          files: ./coverage/lcov.info
-
-  integration-tests:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgis/postgis:16-3.4
-        env:
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: triq_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run db:migrate:test
-      - run: npm run test:integration
-
-  build:
-    runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, unit-tests]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run build
-```
-
-### Deploy Workflow (`.github/workflows/deploy.yml`)
-
-```yaml
-name: Deploy to Production
+name: Build and Deploy to VPS
 
 on:
   push:
     branches: [main]
 
 jobs:
-  deploy:
+  lint-and-build:
     runs-on: ubuntu-latest
-    needs: [ci]
     steps:
       - uses: actions/checkout@v4
-      
-      # Build Docker images
-      - name: Build and push Docker images
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint server
+        run: npm run lint -w apps/server
+
+      - name: Lint web
+        run: npm run lint -w apps/web
+
+      - name: Build server
+        run: npm run build -w apps/server
+
+      - name: Build web
+        run: npm run build -w apps/web
+
+      - name: Package frontend
         run: |
-          docker build -t triq-api:${{ github.sha }} ./backend
-          docker build -t triq-web-admin:${{ github.sha }} ./apps/web-admin
-          docker build -t triq-web-passenger:${{ github.sha }} ./apps/web-passenger
-          docker build -t triq-landing:${{ github.sha }} ./apps/landing-page
-      
-      # Deploy to VPS via SSH
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.0
+          cd apps/web
+          tar -czf ../../deploy-web.tar.gz dist/
+
+      - name: Package backend
+        run: |
+          cd apps/server
+          tar -czf ../../deploy-server.tar.gz dist/ prisma/ package.json prisma/migrations/
+
+      - name: Upload packages to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "deploy-web.tar.gz,deploy-server.tar.gz"
+          target: "/tmp"
+
+      - name: Deploy and restart on VPS
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd /opt/triq
-            git pull origin main
-            
-            # Backup DB before migration
-            docker compose exec -T postgres pg_dump -U triq triq_prod > backups/pre-deploy-$(date +%Y%m%d-%H%M%S).sql
-            
-            # Build and restart
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d --build
-            
-            # Run migrations
-            docker compose exec api npx prisma migrate deploy
-            
-            # Health check
-            curl -f http://localhost:4000/health || exit 1
-            
-            # Cleanup old images
-            docker image prune -f
+            # Deploy frontend
+            rm -rf /var/www/triq/*
+            tar -xzf /tmp/deploy-web.tar.gz -C /var/www/triq --strip-components=1
+
+            # Deploy backend (preserve config/ and .env)
+            cd /var/www/triq-server
+            rm -rf dist prisma package.json node_modules package-lock.json
+            tar -xzf /tmp/deploy-server.tar.gz -C /var/www/triq-server
+
+            # Install dependencies and run migrations
+            cd /var/www/triq-server
+            npm install --production --omit=dev
+            ./node_modules/.bin/prisma generate
+            ./node_modules/.bin/prisma migrate deploy
+            ./node_modules/.bin/prisma db seed
+
+            # Restart PM2
+            pm2 delete triq-server || true
+            pm2 start dist/index.js --name triq-server --update-env
+            pm2 save --force
+
+            # Cleanup
+            rm -f /tmp/deploy-web.tar.gz /tmp/deploy-server.tar.gz
+```
+
+---
+
+## Required GitHub Secrets
+
+Configure these in **GitHub → Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+|--------|-------|
+| `VPS_HOST` | `72.51.57.201` |
+| `VPS_USER` | `triq` |
+| `VPS_SSH_KEY` | Private SSH key (no passphrase) |
+| `VPS_WEB_PATH` | `/var/www/triq` |
+| `VPS_SERVER_PATH` | `/var/www/triq-server` |
+
+---
+
+## Deployment Flow
+
+```
+Developer machine
+       │
+       ▼
+  Git push to main
+       │
+       ▼
+  GitHub Actions Runner
+       │
+       ├── Build server (tsc)
+       ├── Build web (vite)
+       ├── Package into tarballs
+       │
+       ▼
+  SCP to VPS (/tmp)
+       │
+       ▼
+  SSH into VPS
+       ├── Extract frontend → /var/www/triq
+       ├── Extract backend → /var/www/triq-server
+       ├── npm install --production
+       ├── prisma generate
+       ├── prisma migrate deploy (safe, never loses data)
+       ├── prisma db seed (safe upsert)
+       ├── pm2 restart triq-server
+       └── Cleanup tarballs
+       │
+       ▼
+  Live on https://triq.dpdns.org
 ```
 
 ---
@@ -171,208 +169,61 @@ jobs:
 
 | Environment | Purpose | Auto-deploy |
 |-------------|---------|-------------|
-| **Local** | Development | Manual (`docker compose up`) |
-| **Staging** | Pre-production testing | On push to `develop` |
+| **Local** | Development | Manual (`npm run dev`) |
 | **Production** | Live app | On push to `main` |
 
-### Zero-Downtime Deployment
+### Database Migrations
 
-1. **Blue-Green with Docker Compose**:
-   - Run new containers on different ports
-   - Health check passes -> Nginx switches upstream
-   - Old containers stopped after 30s grace period
-
-2. **Database Migrations**:
-   - Always backward-compatible migrations
-   - Deploy code first, then migrate (or vice versa for additive changes)
-   - Never drop columns in same deploy as code removal
+- **Migration files are committed to git** (`prisma/migrations/`)
+- `prisma migrate deploy` applies **only new** migrations
+- **Never deletes data** — additive changes only
+- `prisma db seed` uses `upsert` — safe to run repeatedly
 
 ### Rollback Procedure
 
 ```bash
 # Emergency rollback on VPS
-ssh triq@vps
+ssh triq@72.51.57.201
 
-cd /opt/triq
-
-# Option 1: Rollback to previous Docker image
-docker compose -f docker-compose.prod.yml down
-docker tag triq-api:previous triq-api:latest
-docker compose -f docker-compose.prod.yml up -d
-
-# Option 2: Rollback DB migration (if needed)
-docker compose exec api npx prisma migrate resolve --rolled-back "20260115000000_bad_migration"
-
-# Option 3: Git revert
+# Option 1: Revert git and trigger new deploy
 git revert HEAD
 git push origin main
-```
 
----
+# Option 2: Manual DB rollback (if migration was bad)
+cd /var/www/triq-server
+npx prisma migrate resolve --rolled-back "20260619142931_init"
 
-## Docker Configuration
-
-### Backend Dockerfile
-
-```dockerfile
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-
-FROM node:20-alpine AS runtime
-WORKDIR /app
-COPY --from=builder /app/node_modules ./node_modules
-COPY . .
-RUN npm run build
-EXPOSE 4000
-USER node
-CMD ["node", "dist/index.js"]
-```
-
-### Production Docker Compose (`docker-compose.prod.yml`)
-
-```yaml
-version: '3.8'
-
-services:
-  api:
-    image: triq-api:latest
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-      - JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY}
-      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
-      - PAYMONGO_SECRET_KEY=${PAYMONGO_SECRET_KEY}
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - triq
-    read_only: true
-    tmpfs:
-      - /tmp
-
-  postgres:
-    image: postgis/postgis:16-3.4
-    restart: unless-stopped
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./backups:/backups
-    environment:
-      - POSTGRES_USER=triq
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=triq_prod
-    networks:
-      - triq
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-    networks:
-      - triq
-    command: redis-server --appendonly yes
-
-  nginx:
-    image: nginx:alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/ssl:/etc/nginx/ssl
-      - certbot_data:/etc/letsencrypt
-    depends_on:
-      - api
-    networks:
-      - triq
-
-volumes:
-  postgres_data:
-  redis_data:
-  certbot_data:
-
-networks:
-  triq:
-    internal: false
+# Option 3: Restore from MySQL backup
+# gunzip -c /backups/triq-20260115.sql.gz | mysql -u triq -p triq_db
 ```
 
 ---
 
 ## Backup & Disaster Recovery
 
-### PostgreSQL Backup
+### MySQL Backup
 
 ```bash
-# Automated daily backup (cron on VPS)
-0 2 * * * docker compose exec -T postgres pg_dump -U triq triq_prod | gzip > /opt/triq/backups/triq-$(date +\%Y\%m\%d).sql.gz
+# Automated daily backup via cron on VPS
+crontab -e
+# Add: 0 2 * * * mysqldump -u triq -p'password' triq_db | gzip > /backups/triq-$(date +\%Y\%m\%d).sql.gz
 
 # Retain 30 days
-0 3 * * * find /opt/triq/backups -name "*.sql.gz" -mtime +30 -delete
+0 3 * * * find /backups -name "*.sql.gz" -mtime +30 -delete
 ```
 
 ### Restore Procedure
 
 ```bash
-# Stop app to prevent writes
-docker compose -f docker-compose.prod.yml stop api
+# Stop PM2 to prevent writes
+pm2 stop triq-server
 
 # Restore from backup
-gunzip -c backups/triq-20260115.sql.gz | docker compose exec -T postgres psql -U triq triq_prod
+gunzip -c /backups/triq-20260115.sql.gz | mysql -u triq -p triq_db
 
-# Restart app
-docker compose -f docker-compose.prod.yml start api
+# Restart
+pm2 start triq-server
 ```
-
-### Redis Backup
-
-```bash
-# AOF persistence enabled (appendonly yes)
-# Redis auto-saves to /data/appendonly.aof
-# Docker volume persists this across restarts
-```
-
----
-
-## Mobile App Deployment
-
-### Expo EAS Build
-
-```bash
-# Install EAS CLI
-npm install -g eas-cli
-
-# Configure builds
-npx eas build:configure
-
-# Build for production
-eas build --platform android --profile production
-eas build --platform ios --profile production
-
-# OTA Updates (Expo Updates)
-expo publish --channel production
-```
-
-### App Store Submission
-
-| Platform | Steps |
-|----------|-------|
-| **Android** | Build AAB -> Google Play Console -> Internal Testing -> Production |
-| **iOS** | Build IPA -> App Store Connect -> TestFlight -> App Store Review |
-
-### App Versioning
-
-- **Semantic**: `MAJOR.MINOR.PATCH` (e.g., `1.2.3`)
-- **Major**: Breaking API changes
-- **Minor**: New features (backward compatible)
-- **Patch**: Bug fixes
-- OTA updates allowed for minor/patch (Expo Updates)
-- Major updates require store submission
 
 ---
 
@@ -382,24 +233,22 @@ expo publish --channel production
 
 ```bash
 # API health
-curl https://triq.app/health
+curl https://triq.dpdns.org/api/v1
 
-# Deep health (DB + Redis)
-curl https://triq.app/health/deep
+# Check PM2 status
+pm2 list
 
-# Expected responses:
-# 200 OK = healthy
-# 503 Service Unavailable = degraded (check logs)
+# Check logs
+pm2 logs triq-server --lines 20
 ```
 
 ### Post-Deploy Verification Checklist
 
-- [ ] API responds to `/health`
-- [ ] Database connections normal
-- [ ] Redis memory usage < 80%
+- [ ] Website loads at `https://triq.dpdns.org`
+- [ ] API responds to `/api/v1`
+- [ ] Database migrations applied successfully
+- [ ] PM2 shows `triq-server` as `online`
 - [ ] Nginx serving static files
-- [ ] SSL certificate valid
+- [ ] Cloudflare SSL active
 - [ ] Firebase Auth responding
-- [ ] PayMongo webhooks receiving
-- [ ] Socket.io connections working
 - [ ] No 500 errors in last 5 minutes
