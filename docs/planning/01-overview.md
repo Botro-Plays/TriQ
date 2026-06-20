@@ -28,5 +28,20 @@ To modernize tricycle transportation in Digos City by connecting passengers with
 - **Map Coverage**: Entire Digos City + immediate outskirts (Barangay boundaries, landmarks, terminals)
 
 ## Development Status
-- Phase: **Planning & Architecture**
-- Next step: Scaffold backend, mobile app, and database schema
+- Phase: **MVP Backend Scaffold + Auth Complete**
+- Authentication: ✅ Firebase Phone OTP + Google Sign-In, JWT, Owner claiming
+- Database: ✅ Prisma schema complete (all gap-analysis models), MySQL on VPS, seeded with Digos City data
+- CI/CD: ✅ GitHub Actions → VPS auto-deploy with PM2
+- Frontend: 🟡 Login page complete, all other pages are placeholder stubs
+- Backend Routes: 🟡 Auth fully implemented, all other routes return 501
+- Next step: Implement core ride flow (KYC → Driver online → Create/Accept ride → Complete)
+
+## Recently Completed (2026-06-20)
+- Fixed Prisma Client generation on VPS (packaged from GitHub Actions)
+- Fixed dotenv loading under PM2 (`__dirname`-based path)
+- Google Sign-In as alternative to phone OTP
+- Owner account seeding and claiming workflow
+- Owner button hidden after claimed
+
+## See Also
+- `14-implementation-status.md` — detailed audit of every file
