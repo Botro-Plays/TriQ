@@ -58,17 +58,12 @@ jobs:
       - name: Build Web
         run: npm run build -w apps/web
 
-      - name: Install production deps for server
-        run: |
-          cd apps/server
-          npm install --production --omit=dev
-
-      - name: Copy Prisma Client into server package
+      - name: Copy Prisma Client into @prisma/client
         run: |
           # prisma generate writes to root node_modules/.prisma/client (monorepo)
-          # copy it into apps/server/node_modules/.prisma/client so tarball includes it
-          mkdir -p apps/server/node_modules/.prisma/client
-          cp -r node_modules/.prisma/client/* apps/server/node_modules/.prisma/client/
+          # copy it into @prisma/client/.prisma/client so require resolves correctly
+          mkdir -p node_modules/@prisma/client/.prisma/client
+          cp -r node_modules/.prisma/client/* node_modules/@prisma/client/.prisma/client/
 
       - name: Package frontend
         run: |
@@ -77,8 +72,10 @@ jobs:
 
       - name: Package backend
         run: |
-          cd apps/server
-          tar -czf ../../deploy-server.tar.gz dist/ prisma/ package.json node_modules/ prisma/migrations/
+          # Package server files + root node_modules (has all deps from npm ci)
+          tar -czf deploy-server.tar.gz \
+            -C apps/server dist/ prisma/ package.json prisma/migrations/ \
+            -C ../.. node_modules/
 
       - name: Upload packages to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -105,7 +102,7 @@ jobs:
             rm -rf dist prisma package.json node_modules package-lock.json
             tar -xzf /tmp/deploy-server.tar.gz -C /var/www/triq-server
 
-            # VPS is ready-to-go — just migrate DB and seed
+            # Ready to go — node_modules included from GitHub Actions
             cd /var/www/triq-server
             ./node_modules/.bin/prisma migrate deploy
             ./node_modules/.bin/prisma db seed
