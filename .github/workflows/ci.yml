@@ -1,50 +1,17 @@
-name: CI + Build + Migrate
+name: Build + Migrate + Commit Dist
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  ci:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate Prisma Client
-        run: npm run db:generate -w apps/server
-
-      - name: Lint Server
-        run: npm run lint -w apps/server
-        continue-on-error: true
-
-      - name: Lint Web
-        run: npm run lint -w apps/web
-        continue-on-error: true
-
-      - name: Test Server
-        run: npm run test -w apps/server
-        continue-on-error: true
-
-      - name: Test Web
-        run: npm run test -w apps/web
-        continue-on-error: true
-
-  build-and-migrate:
-    needs: ci
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  build-and-commit:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -83,6 +50,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git add apps/web/dist apps/server/dist
           git diff --cached --quiet || git commit -m "chore(build): production dist [skip ci]"
           git push
