@@ -103,6 +103,28 @@ export default function Login() {
     }
   };
 
+  const attemptAutoLogin = async (idToken: string) => {
+    try {
+      const { data } = await api.post('/auth/verify-token', { idToken });
+      setAuth(data.token, data.user);
+      if (data.user.role === 'PASSENGER') navigate('/passenger');
+      else if (data.user.role === 'DRIVER') navigate('/driver');
+      else navigate('/admin');
+      return true;
+    } catch (err: any) {
+      if (err.response?.status === 400 && err.response?.data?.code === 'PHONE_REQUIRED') {
+        setNeedsPhone(true);
+        (window as any).__pendingIdToken = idToken;
+        setStep('role');
+        return false;
+      }
+      // New user — show role selection
+      (window as any).__pendingIdToken = idToken;
+      setStep('role');
+      return false;
+    }
+  };
+
   const verifyOtp = async () => {
     setError('');
     setLoading(true);
@@ -110,8 +132,7 @@ export default function Login() {
       if (!confirmationRef.current) throw new Error('No OTP sent');
       const result = await confirmationRef.current.confirm(otp);
       const idToken = await result.user.getIdToken();
-      setStep('role');
-      (window as any).__pendingIdToken = idToken;
+      await attemptAutoLogin(idToken);
     } catch (err: any) {
       showError(err.message || 'Invalid OTP');
     } finally {
@@ -128,10 +149,11 @@ export default function Login() {
       const result = await signInWithPopup(auth, provider);
       const idToken = await result.user.getIdToken();
       const hasPhone = !!result.user.phoneNumber;
-      (window as any).__pendingIdToken = idToken;
-      setNeedsPhone(!hasPhone);
-      if (!hasPhone) setPhone('+63');
-      setStep('role');
+      if (!hasPhone) {
+        setNeedsPhone(true);
+        setPhone('+63');
+      }
+      await attemptAutoLogin(idToken);
     } catch (err: any) {
       showError(err.message || 'Google sign-in failed');
     } finally {

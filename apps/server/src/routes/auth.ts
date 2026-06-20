@@ -34,13 +34,14 @@ router.post('/verify-token', async (req, res) => {
       return;
     }
 
-    if (!phoneNumber) {
+    // Upsert user in our database
+    let user = await prisma.user.findUnique({ where: { firebaseUid } });
+
+    // Returning users don't need to re-provide phone number
+    if (!user && !phoneNumber) {
       res.status(400).json({ error: 'Phone number required', code: 'PHONE_REQUIRED' });
       return;
     }
-
-    // Upsert user in our database
-    let user = await prisma.user.findUnique({ where: { firebaseUid } });
 
     // Account linking: if Google user provides phone already registered, link accounts
     if (!user && phoneNumber) {
