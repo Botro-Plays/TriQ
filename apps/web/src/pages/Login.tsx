@@ -28,10 +28,10 @@ function TriQLogo({ className = '' }: { className?: string }) {
       {/* Handlebar */}
       <path d="M58 48h12" stroke="#FACC15" strokeWidth="3" strokeLinecap="round" />
 
-      {/* Sidecar (yellow) — attached right of motorcycle */}
-      <path d="M52 64c0-5 4-8 9-8h22c5 0 9 3 9 8v7H52v-7z" fill="#FACC15" />
+      {/* Sidecar (yellow) — tall pedicab body extending right of motorcycle */}
+      <path d="M52 68c0-7 4-12 9-12h22c5 0 9 5 9 12v12H52v-12z" fill="#FACC15" />
       {/* Sidecar roof dome */}
-      <path d="M56 56c0-6 5-10 11-10s11 4 11 10" stroke="#06B6D4" strokeWidth="2" fill="none" />
+      <path d="M54 56c0-8 5-14 12-14s12 6 12 14" stroke="#06B6D4" strokeWidth="2" fill="none" />
 
       {/* Wheels — solid black with yellow rims, cyan hubs */}
       {/* Rear (motorcycle) */}
