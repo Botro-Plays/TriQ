@@ -52,10 +52,18 @@ export const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
 
-// Serve static files with default options — no custom headers
+// Serve static files BEFORE middleware — avoid HTTP/2 proxy issues
 const webDistPath = path.resolve(__dirname, '../../web/dist');
 if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
-  app.use(express.static(webDistPath));
+  app.use(express.static(webDistPath, {
+    etag: false,
+    lastModified: false,
+    maxAge: '1y',
+    setHeaders: (res) => {
+      // Force connection close per response to avoid HTTP/2 keep-alive frame issues
+      res.setHeader('Connection', 'close');
+    },
+  }));
 }
 
 // Middleware (minimal to avoid HTTP/2 proxy issues)
@@ -119,8 +127,8 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
     // Continue starting server — don't block startup on seed errors
   }
 
-  httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`[TriQ Server] 🛺 Server running on 0.0.0.0:${PORT}`);
+  httpServer.listen(PORT, () => {
+    console.log(`[TriQ Server] 🛺 Server running on port ${PORT}`);
     console.log(`[TriQ Server] 📡 Socket.io ready`);
     console.log(`[TriQ Server] 🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'not configured'}`);
     const webDistPath = path.resolve(__dirname, '../../web/dist');

@@ -4,7 +4,6 @@ const { execSync } = require('child_process');
 
 const REPO_ROOT = __dirname;
 const SERVER_DIR = path.join(REPO_ROOT, 'apps', 'server');
-const WEB_DIR = path.join(REPO_ROOT, 'apps', 'web');
 const DIST_FILE = path.join(SERVER_DIR, 'dist', 'index.js');
 const ENV_FILE = path.join(SERVER_DIR, '.env');
 
@@ -17,15 +16,15 @@ function run(cmd, cwd) {
 }
 
 async function start() {
-  log('=== TriQ Server Startup ===');
+  log('Starting TriQ server...');
   log('Node version:', process.version);
   log('Working directory:', REPO_ROOT);
 
-  // Pull latest
+  // Pull latest (HidenCloud auto-pull may have already done this)
   if (fs.existsSync(path.join(REPO_ROOT, '.git'))) {
     try {
       log('Stashing local changes...');
-      run('git stash', REPO_ROOT);
+      run('git stash --include-untracked', REPO_ROOT);
     } catch {}
     try {
       log('Pulling latest code...');
@@ -37,74 +36,39 @@ async function start() {
     }
   }
 
-  // Check env
+  // Check env file
   if (fs.existsSync(ENV_FILE)) {
-    log('.env file found at', ENV_FILE);
+    const envContent = fs.readFileSync(ENV_FILE, 'utf-8');
+    const hasDbUrl = envContent.includes('DATABASE_URL');
+    const hasPort = envContent.includes('PORT');
+    log('.env file found. DATABASE_URL present:', hasDbUrl, 'PORT present:', hasPort);
   } else {
-    log('WARNING: .env file NOT found at', ENV_FILE);
+    log('WARNING: .env file not found at', ENV_FILE);
   }
 
-  // Install dependencies (including dev for build tools)
-  log('Installing dependencies (including dev)...');
-  try {
-    run('npm install --include=dev', REPO_ROOT);
-  } catch (err) {
-    log('npm install failed:', err.message);
-    log('Trying without dev dependencies...');
-    try { run('npm install', REPO_ROOT); } catch (e) { log('npm install failed again:', e.message); }
+  // Check dist file
+  if (!fs.existsSync(DIST_FILE)) {
+    log('ERROR: No pre-built dist found at', DIST_FILE);
+    process.exit(1);
   }
+  const distStat = fs.statSync(DIST_FILE);
+  log('Pre-built dist found:', DIST_FILE, 'size:', distStat.size, 'bytes');
 
-  // Generate Prisma client
-  log('Generating Prisma client...');
+  // Generate Prisma client (needed even with pre-built dist)
   try {
+    log('Generating Prisma client...');
     run('npx prisma generate', SERVER_DIR);
-    log('Prisma client generated.');
   } catch (err) {
     log('Prisma generate failed:', err.message);
   }
 
-  // Build web (Vite)
-  log('Building web application (Vite)...');
-  try {
-    run('npm run build -w apps/web', REPO_ROOT);
-    log('Web build complete.');
-  } catch (err) {
-    log('Web build failed:', err.message);
-  }
-
-  // Build server (TypeScript)
-  log('Building server (TypeScript)...');
-  try {
-    run('npm run build -w apps/server', REPO_ROOT);
-    log('Server build complete.');
-  } catch (err) {
-    log('Server build failed:', err.message);
-  }
-
-  // Verify dist exists
-  if (!fs.existsSync(DIST_FILE)) {
-    log('ERROR: dist/index.js not found after build. Cannot start server.');
-    process.exit(1);
-  }
-  const distSize = fs.statSync(DIST_FILE).size;
-  log('Server dist ready:', DIST_FILE, '(' + distSize + ' bytes)');
-
-  // Verify web dist exists
-  const webDist = path.join(WEB_DIR, 'dist');
-  if (fs.existsSync(webDist)) {
-    const webFiles = fs.readdirSync(webDist);
-    log('Web dist ready:', webFiles.length, 'files in', webDist);
-  } else {
-    log('WARNING: Web dist not found at', webDist);
-  }
-
-  // Start server
-  log('=== Starting server ===');
+  log('Loading server from dist...');
   require(DIST_FILE);
+  log('Server module loaded successfully.');
 }
 
 start().catch(err => {
-  console.error('[TriQ Boot] FATAL:', err.message);
+  console.error('[TriQ Boot] Fatal startup error:', err.message);
   console.error(err.stack);
   process.exit(1);
 });
