@@ -61,6 +61,11 @@ router.post('/verify-token', async (req, res) => {
     }
 
     if (!user) {
+      // This should not happen due to earlier check, but satisfies TS narrowing
+      if (!phoneNumber) {
+        res.status(400).json({ error: 'Phone number required', code: 'PHONE_REQUIRED' });
+        return;
+      }
       // Prevent anyone from creating a second OWNER
       if (role === 'OWNER') {
         const existingOwner = await prisma.user.findFirst({ where: { role: 'OWNER' } });
