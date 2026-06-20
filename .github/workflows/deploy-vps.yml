@@ -63,6 +63,13 @@ jobs:
           cd apps/server
           npm install --production --omit=dev
 
+      - name: Copy Prisma Client into server package
+        run: |
+          # prisma generate writes to root node_modules/.prisma/client (monorepo)
+          # copy it into apps/server/node_modules/.prisma/client so tarball includes it
+          mkdir -p apps/server/node_modules/.prisma/client
+          cp -r node_modules/.prisma/client/* apps/server/node_modules/.prisma/client/
+
       - name: Package frontend
         run: |
           cd apps/web
