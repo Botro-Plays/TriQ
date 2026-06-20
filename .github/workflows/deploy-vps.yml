@@ -105,7 +105,6 @@ jobs:
             # Ready to go — node_modules included from GitHub Actions
             cd /var/www/triq-server
             ./node_modules/.bin/prisma migrate deploy
-            ./node_modules/.bin/prisma db seed
 
             # Start/restart PM2
             pm2 delete triq-server || true

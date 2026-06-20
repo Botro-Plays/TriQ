@@ -25,6 +25,7 @@ import { setupSocketHandlers } from './socket';
 import { errorHandler } from './middleware/errorHandler';
 import { rateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
+import { seedDatabase } from './lib/seed';
 
 // Routes
 import authRoutes from './routes/auth';
@@ -118,17 +119,27 @@ if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPat
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 
-httpServer.listen(PORT, () => {
-  console.log(`🛺 TriQ Server running on port ${PORT}`);
-  console.log(`📡 Socket.io ready`);
-  console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'not configured'}`);
-  const webDistPath = path.resolve(__dirname, '../../web/dist');
-  if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
-    console.log(`🌐 Frontend PWA served at root /`);
-  } else {
-    console.log(`⚠️  Frontend PWA not built yet (run: npm run build -w apps/web)`);
+// Start server after seeding database
+(async () => {
+  try {
+    await seedDatabase(prisma);
+  } catch (err) {
+    console.error('❌ Seed failed:', err);
+    // Continue starting server — don't block startup on seed errors
   }
-});
+
+  httpServer.listen(PORT, () => {
+    console.log(`🛺 TriQ Server running on port ${PORT}`);
+    console.log(`📡 Socket.io ready`);
+    console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'not configured'}`);
+    const webDistPath = path.resolve(__dirname, '../../web/dist');
+    if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
+      console.log(`🌐 Frontend PWA served at root /`);
+    } else {
+      console.log(`⚠️  Frontend PWA not built yet (run: npm run build -w apps/web)`);
+    }
+  });
+})();
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
