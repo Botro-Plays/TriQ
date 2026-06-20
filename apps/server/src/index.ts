@@ -18,7 +18,6 @@ if (result.error) {
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import compression from 'compression';
 import morgan from 'morgan';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -76,7 +75,6 @@ app.use(cors({
   origin: process.env.WEB_APP_URL || 'http://localhost:5173',
   credentials: true,
 }));
-app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
