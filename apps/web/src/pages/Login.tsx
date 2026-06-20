@@ -7,12 +7,40 @@ import { api } from '../lib/api';
 
 type UserRole = 'PASSENGER' | 'DRIVER' | 'OWNER' | 'STAFF';
 
-const ROLES: { label: string; value: UserRole; description: string }[] = [
-  { label: 'Passenger', value: 'PASSENGER', description: 'Book tricycle rides' },
-  { label: 'Driver', value: 'DRIVER', description: 'Accept ride requests & earn' },
-  { label: 'Staff', value: 'STAFF', description: 'Admin dashboard access' },
-  { label: 'Owner', value: 'OWNER', description: 'Full admin control' },
+const ROLES: { label: string; value: UserRole; description: string; icon: string }[] = [
+  { label: 'Passenger', value: 'PASSENGER', description: 'Book tricycle rides', icon: 'M' },
+  { label: 'Driver', value: 'DRIVER', description: 'Accept ride requests & earn', icon: 'D' },
+  { label: 'Staff', value: 'STAFF', description: 'Admin dashboard access', icon: 'S' },
+  { label: 'Owner', value: 'OWNER', description: 'Full admin control', icon: 'O' },
 ];
+
+/* Inline tricycle SVG logo — matches branding spec until asset handoff */
+function TriQLogo({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 120 120" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Badge background */}
+      <circle cx="60" cy="60" r="54" fill="#0F172A" stroke="#06B6D4" strokeWidth="2" />
+      {/* Neon glow halo */}
+      <circle cx="60" cy="60" r="56" stroke="#06B6D4" strokeWidth="1" opacity="0.3" />
+      {/* Tricycle body — side profile facing right */}
+      <path d="M35 72c0-8 6-14 14-14h8l6-18h16l-4 18h4c8 0 14 6 14 14v4H35v-4z" fill="#FACC15" />
+      {/* Sidecar body */}
+      <path d="M28 72c0-5 4-9 9-9h6v18H28v-9z" fill="#FACC15" />
+      {/* Rear wheel */}
+      <circle cx="38" cy="82" r="10" fill="#1E293B" stroke="#FACC15" strokeWidth="3" />
+      <circle cx="38" cy="82" r="4" fill="#06B6D4" />
+      {/* Front wheel */}
+      <circle cx="82" cy="82" r="8" fill="#1E293B" stroke="#FACC15" strokeWidth="3" />
+      <circle cx="82" cy="82" r="3" fill="#06B6D4" />
+      {/* Sidecar wheel */}
+      <circle cx="28" cy="82" r="6" fill="#1E293B" stroke="#FACC15" strokeWidth="2" />
+      {/* Driver helmet silhouette */}
+      <ellipse cx="72" cy="44" rx="5" ry="6" fill="#1E293B" />
+      {/* Handlebar */}
+      <path d="M78 40h6" stroke="#FACC15" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 export default function Login() {
   const [phone, setPhone] = useState('+63');
@@ -20,57 +48,52 @@ export default function Login() {
   const [step, setStep] = useState<'phone' | 'otp' | 'role'>('phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [shakeError, setShakeError] = useState(false);
   const [needsPhone, setNeedsPhone] = useState(false);
-  const [ownerClaimed, setOwnerClaimed] = useState(true); // Default hide until checked
+  const [ownerClaimed, setOwnerClaimed] = useState(true);
   const confirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const setAuth = useAuthStore((s) => s.setAuth);
   const navigate = useNavigate();
 
-  // Check if owner is already claimed to hide the OWNER role option
   useEffect(() => {
     api.get('/auth/owner-exists')
       .then((res) => setOwnerClaimed(res.data.ownerClaimed))
-      .catch(() => setOwnerClaimed(true)); // Fail-safe: hide OWNER on error
+      .catch(() => setOwnerClaimed(true));
   }, []);
+
+  const showError = (msg: string) => {
+    setError(msg);
+    setShakeError(true);
+    setTimeout(() => setShakeError(false), 500);
+  };
 
   const availableRoles = ownerClaimed
     ? ROLES.filter((r) => r.value !== 'OWNER')
     : ROLES;
+
+  const isPhoneValid = phone.replace('+63', '').replace(/\D/g, '').length >= 10;
 
   const sendOtp = async () => {
     setError('');
     setLoading(true);
     try {
       const formatted = phone.startsWith('+') ? phone : '+63' + phone.replace(/^0/, '');
-
-      // Clear any stale verifier
       if (recaptchaRef.current) {
         recaptchaRef.current.clear();
         recaptchaRef.current = null;
       }
-
-      // Create and explicitly render invisible reCAPTCHA
       const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         size: 'invisible',
-        callback: (response: string) => {
-          console.log('[reCAPTCHA] solved:', response ? 'token received' : 'empty');
-        },
-        'expired-callback': () => {
-          console.warn('[reCAPTCHA] expired, will retry');
-        },
+        callback: () => {},
+        'expired-callback': () => {},
       });
-
       recaptchaRef.current = verifier;
       await verifier.render();
-      console.log('[reCAPTCHA] rendered');
-
       confirmationRef.current = await signInWithPhoneNumber(auth, formatted, verifier);
       setStep('otp');
     } catch (err: any) {
-      console.error('sendOtp error:', err);
-      setError(err.message || 'Failed to send OTP');
-      // Clean up on error
+      showError(err.message || 'Failed to send OTP');
       if (recaptchaRef.current) {
         recaptchaRef.current.clear();
         recaptchaRef.current = null;
@@ -87,12 +110,10 @@ export default function Login() {
       if (!confirmationRef.current) throw new Error('No OTP sent');
       const result = await confirmationRef.current.confirm(otp);
       const idToken = await result.user.getIdToken();
-      // Store Firebase ID token temporarily; backend will create user and return TriQ JWT
       setStep('role');
-      // Store idToken for role selection step
       (window as any).__pendingIdToken = idToken;
     } catch (err: any) {
-      setError(err.message || 'Invalid OTP');
+      showError(err.message || 'Invalid OTP');
     } finally {
       setLoading(false);
     }
@@ -107,16 +128,12 @@ export default function Login() {
       const result = await signInWithPopup(auth, provider);
       const idToken = await result.user.getIdToken();
       const hasPhone = !!result.user.phoneNumber;
-
       (window as any).__pendingIdToken = idToken;
       setNeedsPhone(!hasPhone);
-      if (!hasPhone) {
-        setPhone('+63');
-      }
+      if (!hasPhone) setPhone('+63');
       setStep('role');
     } catch (err: any) {
-      console.error('Google sign-in error:', err);
-      setError(err.message || 'Google sign-in failed');
+      showError(err.message || 'Google sign-in failed');
     } finally {
       setLoading(false);
     }
@@ -127,13 +144,11 @@ export default function Login() {
     try {
       const idToken = (window as any).__pendingIdToken;
       if (!idToken) throw new Error('Session expired');
-
       const payload: any = { idToken, role };
       if (needsPhone) {
         const formatted = phone.startsWith('+') ? phone : '+63' + phone.replace(/^0/, '');
         payload.phone = formatted;
       }
-
       const { data } = await api.post('/auth/verify-token', payload);
       setAuth(data.token, data.user);
       if (data.user.role === 'PASSENGER') navigate('/passenger');
@@ -141,12 +156,12 @@ export default function Login() {
       else navigate('/admin');
     } catch (err: any) {
       if (err.response?.data?.code === 'PHONE_REQUIRED') {
-        setError('Please enter your phone number');
+        showError('Please enter your phone number');
         setNeedsPhone(true);
         setStep('role');
         return;
       }
-      setError(err.response?.data?.error || err.message);
+      showError(err.response?.data?.error || err.message);
       setStep('phone');
     } finally {
       setLoading(false);
@@ -155,117 +170,204 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-triq-dark p-4">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-triq-yellow drop-shadow-neon-yellow">TriQ</h1>
-        <p className="text-gray-400 mt-2">Tricycle Booking for Digos City</p>
+    <div className="min-h-screen bg-triq-dark flex flex-col items-center justify-center px-5 py-8">
+      {/* Logo + Branding */}
+      <div className="flex flex-col items-center mb-8">
+        <TriQLogo className="w-20 h-20 mb-4 animate-pulse" />
+        <h1 className="text-5xl font-extrabold tracking-tight">
+          <span className="text-triq-yellow">Tri</span>
+          <span className="text-triq-cyan">Q</span>
+        </h1>
+        <p className="text-triq-light text-sm mt-2 text-center leading-relaxed">
+          Tricycle Booking in Digos City<br />
+          <span className="text-triq-cyan/70">Padulong na! Booking made easy.</span>
+        </p>
       </div>
 
       <div id="recaptcha-container" />
 
-      {step === 'phone' && (
-        <div className="w-full max-w-sm space-y-4">
-          <label className="block text-sm text-gray-300">Phone Number</label>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+63 912 345 6789"
-            className="w-full p-3 rounded-lg bg-triq-slate border border-triq-light text-white focus:border-triq-cyan focus:outline-none"
-          />
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          <button
-            onClick={sendOtp}
-            disabled={loading}
-            className="w-full p-3 rounded-lg bg-triq-cyan text-triq-dark font-bold hover:shadow-neon transition-all disabled:opacity-50"
-          >
-            {loading ? 'Sending...' : 'Send OTP'}
-          </button>
+      {/* Card Container */}
+      <div className={`w-full max-w-sm bg-triq-slate rounded-2xl border border-triq-light/20 shadow-neon-sm p-6 ${shakeError ? 'animate-shake' : ''}`}>
 
-          <div className="relative py-2">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-triq-light/30" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-2 bg-triq-dark text-gray-500">or</span>
-            </div>
-          </div>
-
-          <button
-            onClick={signInWithGoogle}
-            disabled={loading}
-            className="w-full p-3 rounded-lg bg-white text-gray-800 font-semibold hover:bg-gray-100 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-            </svg>
-            Sign in with Google
-          </button>
-        </div>
-      )}
-
-      {step === 'otp' && (
-        <div className="w-full max-w-sm space-y-4">
-          <label className="block text-sm text-gray-300">Enter OTP</label>
-          <input
-            type="text"
-            value={otp}
-            onChange={(e) => setOtp(e.target.value)}
-            placeholder="123456"
-            maxLength={6}
-            className="w-full p-3 rounded-lg bg-triq-slate border border-triq-light text-white focus:border-triq-cyan focus:outline-none"
-          />
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          <button
-            onClick={verifyOtp}
-            disabled={loading}
-            className="w-full p-3 rounded-lg bg-triq-cyan text-triq-dark font-bold hover:shadow-neon transition-all disabled:opacity-50"
-          >
-            {loading ? 'Verifying...' : 'Verify OTP'}
-          </button>
-          <button
-            onClick={() => setStep('phone')}
-            className="w-full text-sm text-gray-400 hover:text-white"
-          >
-            Change phone number
-          </button>
-        </div>
-      )}
-
-      {step === 'role' && (
-        <div className="w-full max-w-sm space-y-4">
-          <p className="text-center text-gray-300">Select your role</p>
-          {needsPhone && (
-            <div className="space-y-2">
-              <label className="block text-sm text-gray-300">Phone Number (required for rides)</label>
+        {step === 'phone' && (
+          <div className="space-y-5">
+            <div>
+              <label className="block text-xs font-semibold text-triq-light uppercase tracking-wider mb-2">
+                Mobile Number
+              </label>
               <input
                 type="tel"
+                inputMode="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+63 912 345 6789"
-                className="w-full p-3 rounded-lg bg-triq-slate border border-triq-light text-white focus:border-triq-cyan focus:outline-none"
+                className="w-full h-12 px-4 rounded-xl bg-triq-dark border border-triq-light/30 text-white placeholder-triq-light/50 text-base
+                  focus:border-triq-cyan focus:ring-2 focus:ring-triq-cyan/20 focus:outline-none transition-all"
               />
+              <p className="text-[11px] text-triq-light/50 mt-1.5">
+                We'll send a 6-digit verification code
+              </p>
             </div>
-          )}
-          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-          <div className="space-y-3">
-            {availableRoles.map((r) => (
-              <button
-                key={r.value}
-                onClick={() => selectRole(r.value)}
-                disabled={loading || (needsPhone && !phone.replace('+63', '').replace(/^0/, ''))}
-                className="w-full p-4 rounded-xl bg-triq-slate border border-triq-light hover:border-triq-cyan hover:shadow-neon transition-all text-left disabled:opacity-50"
-              >
-                <div className="text-white font-semibold">{r.label}</div>
-                <div className="text-sm text-gray-400">{r.description}</div>
-              </button>
-            ))}
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
+
+            <button
+              onClick={sendOtp}
+              disabled={loading || !isPhoneValid}
+              className="w-full h-12 rounded-xl bg-triq-yellow text-triq-dark font-bold text-base
+                active:scale-[0.97] transition-transform
+                hover:shadow-neon-yellow disabled:opacity-40 disabled:cursor-not-allowed
+                flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <span className="inline-block w-5 h-5 border-2 border-triq-dark/30 border-t-triq-dark rounded-full animate-spin" />
+              ) : (
+                'Send OTP'
+              )}
+            </button>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-triq-light/20" />
+              <span className="text-[11px] text-triq-light/40 font-medium uppercase tracking-wider">or</span>
+              <div className="flex-1 h-px bg-triq-light/20" />
+            </div>
+
+            {/* Google Button */}
+            <button
+              onClick={signInWithGoogle}
+              disabled={loading}
+              className="w-full h-12 rounded-xl bg-white text-triq-dark font-semibold text-sm
+                active:scale-[0.97] transition-transform
+                hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed
+                flex items-center justify-center gap-2.5"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+              </svg>
+              Sign in with Google
+            </button>
           </div>
-        </div>
-      )}
+        )}
+
+        {step === 'otp' && (
+          <div className="space-y-5">
+            <div>
+              <label className="block text-xs font-semibold text-triq-light uppercase tracking-wider mb-2">
+                Verification Code
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="123456"
+                maxLength={6}
+                className="w-full h-12 px-4 rounded-xl bg-triq-dark border border-triq-light/30 text-white placeholder-triq-light/50 text-center text-lg font-mono tracking-[0.5em]
+                  focus:border-triq-cyan focus:ring-2 focus:ring-triq-cyan/20 focus:outline-none transition-all"
+              />
+              <p className="text-[11px] text-triq-light/50 mt-1.5 text-center">
+                Sent to {phone}
+              </p>
+            </div>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
+
+            <button
+              onClick={verifyOtp}
+              disabled={loading || otp.length < 6}
+              className="w-full h-12 rounded-xl bg-triq-yellow text-triq-dark font-bold text-base
+                active:scale-[0.97] transition-transform
+                hover:shadow-neon-yellow disabled:opacity-40 disabled:cursor-not-allowed
+                flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <span className="inline-block w-5 h-5 border-2 border-triq-dark/30 border-t-triq-dark rounded-full animate-spin" />
+              ) : (
+                'Verify Code'
+              )}
+            </button>
+
+            <button
+              onClick={() => setStep('phone')}
+              className="w-full text-sm text-triq-light/60 hover:text-triq-cyan transition-colors py-1"
+            >
+              Change phone number
+            </button>
+          </div>
+        )}
+
+        {step === 'role' && (
+          <div className="space-y-5">
+            <div className="text-center">
+              <h2 className="text-lg font-bold text-white">Kinsa ka?</h2>
+              <p className="text-sm text-triq-light/60 mt-1">Select your role to continue</p>
+            </div>
+
+            {needsPhone && (
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-triq-light uppercase tracking-wider">
+                  Phone Number <span className="text-triq-yellow">*</span>
+                </label>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+63 912 345 6789"
+                  className="w-full h-12 px-4 rounded-xl bg-triq-dark border border-triq-light/30 text-white placeholder-triq-light/50 text-base
+                    focus:border-triq-cyan focus:ring-2 focus:ring-triq-cyan/20 focus:outline-none transition-all"
+                />
+                <p className="text-[11px] text-triq-light/50">Required for ride bookings</p>
+              </div>
+            )}
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-2.5">
+              {availableRoles.map((r) => (
+                <button
+                  key={r.value}
+                  onClick={() => selectRole(r.value)}
+                  disabled={loading || (needsPhone && !phone.replace('+63', '').replace(/\D/g, '').length)}
+                  className="w-full group relative flex items-center gap-4 p-4 rounded-xl
+                    bg-triq-dark border border-triq-light/20
+                    hover:border-triq-cyan hover:shadow-neon-sm
+                    active:scale-[0.98] transition-all
+                    disabled:opacity-40 disabled:cursor-not-allowed text-left"
+                >
+                  <div className="w-10 h-10 rounded-full bg-triq-light/10 flex items-center justify-center text-triq-cyan font-bold text-sm shrink-0
+                    group-hover:bg-triq-cyan/20 transition-colors">
+                    {r.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white font-semibold text-sm">{r.label}</div>
+                    <div className="text-xs text-triq-light/50 truncate">{r.description}</div>
+                  </div>
+                  <svg className="w-4 h-4 text-triq-light/30 group-hover:text-triq-cyan transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

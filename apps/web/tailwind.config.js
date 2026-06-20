@@ -27,6 +27,14 @@ export default {
       },
       animation: {
         pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        shake: 'shake 0.5s ease-in-out',
+      },
+      keyframes: {
+        shake: {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '25%': { transform: 'translateX(-6px)' },
+          '75%': { transform: 'translateX(6px)' },
+        },
       },
     },
   },
