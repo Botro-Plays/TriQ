@@ -14,64 +14,35 @@ const ROLES: { label: string; value: UserRole; description: string; icon: string
   { label: 'Owner', value: 'OWNER', description: 'Full admin control', icon: 'O' },
 ];
 
-/* Inline Filipino tricycle SVG — side profile, motorcycle + sidecar on right, triangular wheels */
+/* BIMI-ready minimal tricycle icon — solid shapes only, works at 32px */
 function TriQLogo({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 120 120" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Badge background */}
+      {/* Badge */}
       <circle cx="60" cy="60" r="54" fill="#0F172A" stroke="#06B6D4" strokeWidth="2" />
-      {/* Neon glow halo */}
-      <circle cx="60" cy="60" r="56" stroke="#06B6D4" strokeWidth="1" opacity="0.3" />
+      <circle cx="60" cy="60" r="56" stroke="#06B6D4" strokeWidth="1" opacity="0.25" />
 
-      {/* === MOTORCYCLE (yellow, facing right, low and long) === */}
-      {/* Main frame / engine block (low, long) */}
-      <path d="M32 66h26c3 0 5 2 5 5v6H32v-11z" fill="#FACC15" />
-      {/* Fuel tank / upper frame slope */}
-      <path d="M36 58c0-2 2-4 4-4h12c3 0 5 2 5 5v7H36v-8z" fill="#FACC15" />
-      {/* Rear fender */}
-      <path d="M28 64c0-4 3-7 7-7h4v10h-11v-3z" fill="#FACC15" />
-      {/* Front fork / handlebar area */}
-      <path d="M63 54l4-14" stroke="#FACC15" strokeWidth="2.5" strokeLinecap="round" />
+      {/* Motorcycle body (yellow) — low, long, facing right */}
+      <path d="M26 62h32c4 0 7 3 7 7v5H26v-12z" fill="#FACC15" />
+      <path d="M30 54c0-3 3-5 6-5h14c4 0 6 2 6 5v8H30v-8z" fill="#FACC15" />
       {/* Handlebar */}
-      <path d="M63 42h10" stroke="#FACC15" strokeWidth="2" strokeLinecap="round" />
-      {/* Seat */}
-      <rect x="40" y="52" width="14" height="5" rx="2" fill="#1E293B" />
-      {/* Headlight */}
-      <circle cx="68" cy="52" r="2" fill="#06B6D4" />
+      <path d="M58 48h12" stroke="#FACC15" strokeWidth="3" strokeLinecap="round" />
 
-      {/* === SIDECAR — attached to RIGHT of motorcycle === */}
-      {/* Sidecar body (boxy, extending right from motorcycle) */}
-      <path d="M56 68c0-5 4-8 8-8h18c4 0 7 3 7 8v7H56v-7z" fill="#FACC15" />
-      {/* Sidecar seat */}
-      <rect x="62" y="56" width="14" height="5" rx="2" fill="#1E293B" />
-      {/* Sidecar roof / canopy */}
-      <path d="M60 56c0-7 5-11 12-11s12 4 12 11" stroke="#06B6D4" strokeWidth="1.5" fill="none" />
-      {/* Roof support poles */}
-      <line x1="62" y1="56" x2="62" y2="68" stroke="#06B6D4" strokeWidth="1" opacity="0.6" />
-      <line x1="84" y1="56" x2="84" y2="68" stroke="#06B6D4" strokeWidth="1" opacity="0.6" />
-      {/* Windshield */}
-      <path d="M60 56v-5c0-2 2-4 4-4" stroke="#06B6D4" strokeWidth="0.8" fill="none" opacity="0.5" />
+      {/* Sidecar (yellow) — attached right of motorcycle */}
+      <path d="M52 64c0-5 4-8 9-8h22c5 0 9 3 9 8v7H52v-7z" fill="#FACC15" />
+      {/* Sidecar roof dome */}
+      <path d="M56 56c0-6 5-10 11-10s11 4 11 10" stroke="#06B6D4" strokeWidth="2" fill="none" />
 
-      {/* === WHEELS — triangular layout === */}
-      {/* Rear wheel (motorcycle — largest, under back of bike) */}
-      <circle cx="34" cy="86" r="10" fill="#1E293B" stroke="#FACC15" strokeWidth="2.5" />
-      <circle cx="34" cy="86" r="3.5" fill="#06B6D4" />
-      <circle cx="34" cy="86" r="6.5" stroke="#334155" strokeWidth="0.5" fill="none" />
-
-      {/* Front wheel (motorcycle — medium, at front fork) */}
-      <circle cx="70" cy="86" r="8" fill="#1E293B" stroke="#FACC15" strokeWidth="2.5" />
-      <circle cx="70" cy="86" r="3" fill="#06B6D4" />
-      <circle cx="70" cy="86" r="5" stroke="#334155" strokeWidth="0.5" fill="none" />
-
-      {/* Sidecar wheel (smallest, under sidecar body on right) */}
-      <circle cx="90" cy="86" r="6" fill="#1E293B" stroke="#FACC15" strokeWidth="2" />
-      <circle cx="90" cy="86" r="2.5" fill="#06B6D4" />
-
-      {/* === DRIVER === */}
-      {/* Helmet */}
-      <ellipse cx="48" cy="46" rx="3.5" ry="4.5" fill="#1E293B" />
-      {/* Shoulders/body */}
-      <path d="M44 52h8v4h-8z" fill="#1E293B" />
+      {/* Wheels — solid black with yellow rims, cyan hubs */}
+      {/* Rear (motorcycle) */}
+      <circle cx="32" cy="84" r="11" fill="#0F172A" stroke="#FACC15" strokeWidth="2" />
+      <circle cx="32" cy="84" r="4" fill="#06B6D4" />
+      {/* Front (motorcycle) */}
+      <circle cx="66" cy="84" r="9" fill="#0F172A" stroke="#FACC15" strokeWidth="2" />
+      <circle cx="66" cy="84" r="3" fill="#06B6D4" />
+      {/* Sidecar (right) */}
+      <circle cx="92" cy="84" r="7" fill="#0F172A" stroke="#FACC15" strokeWidth="2" />
+      <circle cx="92" cy="84" r="2.5" fill="#06B6D4" />
     </svg>
   );
 }
