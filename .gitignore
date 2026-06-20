@@ -31,7 +31,8 @@ yarn-error.log*
 Thumbs.db
 
 # Prisma
-apps/server/prisma/migrations/
+# Keep migrations for production deploys
+# apps/server/prisma/migrations/
 
 # Expo
 .expo/

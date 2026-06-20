@@ -17,13 +17,15 @@ router.post('/verify-token', async (req, res) => {
       return;
     }
 
-    let phoneNumber: string;
+    let phoneNumber: string | undefined;
     let firebaseUid: string;
+    let displayName: string | undefined;
 
     try {
       const firebaseUser = await verifyFirebaseToken(idToken);
-      phoneNumber = firebaseUser.phone_number!;
+      phoneNumber = firebaseUser.phone_number || req.body.phone;
       firebaseUid = firebaseUser.uid;
+      displayName = firebaseUser.name || phoneNumber;
     } catch (err: any) {
       console.warn('Firebase token verification failed:', err.message);
       res.status(401).json({ error: 'Invalid token' });
@@ -31,7 +33,7 @@ router.post('/verify-token', async (req, res) => {
     }
 
     if (!phoneNumber) {
-      res.status(400).json({ error: 'Phone number not found' });
+      res.status(400).json({ error: 'Phone number required', code: 'PHONE_REQUIRED' });
       return;
     }
 
@@ -51,11 +53,11 @@ router.post('/verify-token', async (req, res) => {
       // Create Passenger or Driver profile
       if (newRole === 'PASSENGER') {
         await prisma.passenger.create({
-          data: { userId: user.id, name: phoneNumber },
+          data: { userId: user.id, name: displayName || phoneNumber },
         });
       } else if (newRole === 'DRIVER') {
         await prisma.driver.create({
-          data: { userId: user.id, name: phoneNumber, plateNumber: 'PENDING-' + Date.now() },
+          data: { userId: user.id, name: displayName || phoneNumber, plateNumber: 'PENDING-' + Date.now() },
         });
       }
     }
