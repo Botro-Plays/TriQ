@@ -24,15 +24,11 @@ else {
 }
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
-const helmet_1 = __importDefault(require("helmet"));
-const morgan_1 = __importDefault(require("morgan"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
 const client_1 = require("@prisma/client");
 const socket_1 = require("./socket");
 const errorHandler_1 = require("./middleware/errorHandler");
-const rateLimiter_1 = require("./middleware/rateLimiter");
-const requestLogger_1 = require("./middleware/requestLogger");
 const logger_1 = require("./lib/logger");
 const seed_1 = require("./lib/seed");
 // Routes
@@ -55,19 +51,22 @@ const io = new socket_io_1.Server(httpServer, {
 exports.prisma = new client_1.PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
-// Middleware
-app.use((0, helmet_1.default)({
-    contentSecurityPolicy: false, // Disable CSP — may cause HTTP/2 proxy issues with HidenCloud
-}));
+// Serve static files BEFORE middleware — avoid HTTP/2 proxy issues
+const webDistPath = path_1.default.resolve(__dirname, '../../web/dist');
+if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
+    app.use(express_1.default.static(webDistPath, {
+        etag: false,
+        lastModified: false,
+        maxAge: '1y',
+    }));
+}
+// Middleware (minimal to avoid HTTP/2 proxy issues)
 app.use((0, cors_1.default)({
     origin: process.env.WEB_APP_URL || 'http://localhost:5173',
     credentials: true,
 }));
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
-app.use((0, morgan_1.default)(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use(requestLogger_1.requestLogger);
-app.use(rateLimiter_1.rateLimiter);
 // Health check
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -85,19 +84,8 @@ app.use('/api/v1/reports', report_1.default);
 (0, socket_1.setupSocketHandlers)(io, exports.prisma);
 // Error handling (must be last)
 app.use(errorHandler_1.errorHandler);
-// Serve built web app (PWA) static files
-const webDistPath = path_1.default.resolve(__dirname, '../../web/dist');
+// React Router catch-all: serve index.html for non-API routes
 if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
-    // Use express.static with HTTP/2-compatible options
-    app.use(express_1.default.static(webDistPath, {
-        etag: false, // Disable ETag to avoid HTTP/2 proxy issues
-        lastModified: false, // Disable Last-Modified to avoid HTTP/2 proxy issues
-        maxAge: '1y', // Long cache for hashed assets
-        setHeaders: (res) => {
-            res.removeHeader('X-Powered-By');
-        },
-    }));
-    // React Router catch-all: serve index.html for non-API routes
     app.get('*', (req, res) => {
         // Don't serve index.html for API routes
         if (req.path.startsWith('/api/')) {

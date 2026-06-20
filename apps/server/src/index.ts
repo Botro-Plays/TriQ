@@ -52,19 +52,23 @@ export const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
 
-// Middleware
-app.use(helmet({
-  contentSecurityPolicy: false, // Disable CSP — may cause HTTP/2 proxy issues with HidenCloud
-}));
+// Serve static files BEFORE middleware — avoid HTTP/2 proxy issues
+const webDistPath = path.resolve(__dirname, '../../web/dist');
+if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
+  app.use(express.static(webDistPath, {
+    etag: false,
+    lastModified: false,
+    maxAge: '1y',
+  }));
+}
+
+// Middleware (minimal to avoid HTTP/2 proxy issues)
 app.use(cors({
   origin: process.env.WEB_APP_URL || 'http://localhost:5173',
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use(requestLogger);
-app.use(rateLimiter);
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -87,20 +91,8 @@ setupSocketHandlers(io, prisma);
 // Error handling (must be last)
 app.use(errorHandler);
 
-// Serve built web app (PWA) static files
-const webDistPath = path.resolve(__dirname, '../../web/dist');
+// React Router catch-all: serve index.html for non-API routes
 if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
-  // Use express.static with HTTP/2-compatible options
-  app.use(express.static(webDistPath, {
-    etag: false, // Disable ETag to avoid HTTP/2 proxy issues
-    lastModified: false, // Disable Last-Modified to avoid HTTP/2 proxy issues
-    maxAge: '1y', // Long cache for hashed assets
-    setHeaders: (res) => {
-      res.removeHeader('X-Powered-By');
-    },
-  }));
-
-  // React Router catch-all: serve index.html for non-API routes
   app.get('*', (req, res) => {
     // Don't serve index.html for API routes
     if (req.path.startsWith('/api/')) {
