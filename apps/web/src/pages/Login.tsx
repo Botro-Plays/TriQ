@@ -14,7 +14,7 @@ const ROLES: { label: string; value: UserRole; description: string; icon: string
   { label: 'Owner', value: 'OWNER', description: 'Full admin control', icon: 'O' },
 ];
 
-/* Inline tricycle SVG logo — matches branding spec until asset handoff */
+/* Inline Filipino tricycle SVG — side profile facing right with motorcycle body + sidecar */
 function TriQLogo({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 120 120" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -22,22 +22,52 @@ function TriQLogo({ className = '' }: { className?: string }) {
       <circle cx="60" cy="60" r="54" fill="#0F172A" stroke="#06B6D4" strokeWidth="2" />
       {/* Neon glow halo */}
       <circle cx="60" cy="60" r="56" stroke="#06B6D4" strokeWidth="1" opacity="0.3" />
-      {/* Tricycle body — side profile facing right */}
-      <path d="M35 72c0-8 6-14 14-14h8l6-18h16l-4 18h4c8 0 14 6 14 14v4H35v-4z" fill="#FACC15" />
-      {/* Sidecar body */}
-      <path d="M28 72c0-5 4-9 9-9h6v18H28v-9z" fill="#FACC15" />
-      {/* Rear wheel */}
-      <circle cx="38" cy="82" r="10" fill="#1E293B" stroke="#FACC15" strokeWidth="3" />
-      <circle cx="38" cy="82" r="4" fill="#06B6D4" />
-      {/* Front wheel */}
-      <circle cx="82" cy="82" r="8" fill="#1E293B" stroke="#FACC15" strokeWidth="3" />
-      <circle cx="82" cy="82" r="3" fill="#06B6D4" />
-      {/* Sidecar wheel */}
-      <circle cx="28" cy="82" r="6" fill="#1E293B" stroke="#FACC15" strokeWidth="2" />
-      {/* Driver helmet silhouette */}
-      <ellipse cx="72" cy="44" rx="5" ry="6" fill="#1E293B" />
+
+      {/* === MOTORCYCLE BODY (yellow) === */}
+      {/* Engine block / lower frame */}
+      <rect x="44" y="62" width="22" height="10" rx="3" fill="#FACC15" />
+      {/* Fuel tank / seat base */}
+      <path d="M50 58c0-3 3-5 6-5h6c3 0 5 2 5 5v4H50v-4z" fill="#FACC15" />
+      {/* Seat */}
+      <rect x="52" y="52" width="12" height="5" rx="2" fill="#1E293B" />
+      {/* Handlebar stem */}
+      <path d="M68 55v-8" stroke="#FACC15" strokeWidth="2" strokeLinecap="round" />
       {/* Handlebar */}
-      <path d="M78 40h6" stroke="#FACC15" strokeWidth="2" strokeLinecap="round" />
+      <path d="M64 47h10" stroke="#FACC15" strokeWidth="2" strokeLinecap="round" />
+      {/* Headlight */}
+      <circle cx="75" cy="53" r="2" fill="#06B6D4" />
+
+      {/* === SIDECAR (yellow) — attached on right side === */}
+      {/* Sidecar floor/body */}
+      <path d="M28 68c0-4 3-7 7-7h16c4 0 7 3 7 7v8H28v-8z" fill="#FACC15" />
+      {/* Sidecar seat */}
+      <rect x="32" y="58" width="14" height="5" rx="2" fill="#1E293B" />
+      {/* Sidecar roof / canopy frame */}
+      <path d="M30 58c0-6 5-10 11-10s11 4 11 10" stroke="#06B6D4" strokeWidth="1.5" fill="none" />
+      {/* Sidecar front windscreen */}
+      <path d="M30 58v-6c0-2 2-4 4-4" stroke="#06B6D4" strokeWidth="1" fill="none" opacity="0.5" />
+
+      {/* === WHEELS === */}
+      {/* Rear wheel (motorcycle — largest) */}
+      <circle cx="44" cy="84" r="11" fill="#1E293B" stroke="#FACC15" strokeWidth="2.5" />
+      <circle cx="44" cy="84" r="4" fill="#06B6D4" />
+      {/* Spokes hint */}
+      <circle cx="44" cy="84" r="7" stroke="#334155" strokeWidth="0.5" fill="none" />
+
+      {/* Front wheel (motorcycle — medium) */}
+      <circle cx="78" cy="84" r="8" fill="#1E293B" stroke="#FACC15" strokeWidth="2.5" />
+      <circle cx="78" cy="84" r="3" fill="#06B6D4" />
+      <circle cx="78" cy="84" r="5" stroke="#334155" strokeWidth="0.5" fill="none" />
+
+      {/* Sidecar wheel (smallest) */}
+      <circle cx="24" cy="84" r="6" fill="#1E293B" stroke="#FACC15" strokeWidth="2" />
+      <circle cx="24" cy="84" r="2.5" fill="#06B6D4" />
+
+      {/* === DRIVER === */}
+      {/* Helmet */}
+      <ellipse cx="58" cy="46" rx="4" ry="5" fill="#1E293B" />
+      {/* Body */}
+      <path d="M54 52h8v6h-8z" fill="#1E293B" />
     </svg>
   );
 }
