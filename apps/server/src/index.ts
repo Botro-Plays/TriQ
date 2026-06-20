@@ -5,7 +5,14 @@ import path from 'path';
 const envPath = process.env.NODE_ENV === 'production'
   ? path.resolve(__dirname, '..', '.env')
   : path.resolve(__dirname, '..', '..', '.env.local');
-dotenv.config({ path: envPath });
+console.log('🔧 Loading .env from:', envPath);
+console.log('🔧 __dirname:', __dirname);
+const result = dotenv.config({ path: envPath });
+if (result.error) {
+  console.error('❌ dotenv error:', result.error);
+} else {
+  console.log('✅ dotenv loaded, DATABASE_URL exists:', !!process.env.DATABASE_URL);
+}
 
 import express from 'express';
 import cors from 'cors';
