@@ -103,23 +103,27 @@ else {
 const PORT = parseInt(process.env.PORT || '4000', 10);
 // Start server after seeding database
 (async () => {
+    console.log('[TriQ Server] Starting server initialization...');
+    console.log('[TriQ Server] PORT:', PORT, 'NODE_ENV:', process.env.NODE_ENV);
     try {
+        console.log('[TriQ Server] Seeding database...');
         await (0, seed_1.seedDatabase)(exports.prisma);
+        console.log('[TriQ Server] Database seed complete.');
     }
     catch (err) {
-        logger_1.logger.error('❌ Seed failed:', err);
+        console.error('[TriQ Server] ❌ Seed failed:', err);
         // Continue starting server — don't block startup on seed errors
     }
     httpServer.listen(PORT, () => {
-        logger_1.logger.log(`🛺 TriQ Server running on port ${PORT}`);
-        logger_1.logger.log(`📡 Socket.io ready`);
-        logger_1.logger.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'not configured'}`);
+        console.log(`[TriQ Server] 🛺 Server running on port ${PORT}`);
+        console.log(`[TriQ Server] 📡 Socket.io ready`);
+        console.log(`[TriQ Server] 🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'not configured'}`);
         const webDistPath = path_1.default.resolve(__dirname, '../../web/dist');
         if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
-            logger_1.logger.log(`🌐 Frontend PWA served at root /`);
+            console.log(`[TriQ Server] 🌐 Frontend PWA served at root /`);
         }
         else {
-            logger_1.logger.log(`⚠️  Frontend PWA not built yet (run: npm run build -w apps/web)`);
+            console.log(`[TriQ Server] ⚠️  Frontend PWA not built yet`);
         }
     });
 })();
