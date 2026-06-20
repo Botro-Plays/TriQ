@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { logger } from './logger';
 
 /**
  * Idempotent database seed — safe to run on every server startup.
@@ -62,5 +63,5 @@ export async function seedDatabase(prisma: PrismaClient) {
     },
   });
 
-  console.log('✅ Seed complete');
+  logger.log('✅ Seed complete');
 }

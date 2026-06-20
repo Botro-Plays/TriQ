@@ -4,13 +4,15 @@ import path from 'path';
 // Load environment variables FIRST — before any imports that create PrismaClient
 // __dirname in compiled CommonJS points to dist/, so go up one level to project root
 const envPath = path.join(__dirname, '..', '.env');
-console.log('🔧 Loading .env from:', envPath);
-console.log('🔧 __dirname:', __dirname);
+if (process.env.NODE_ENV !== 'production') {
+  console.log('🔧 Loading .env from:', envPath);
+  console.log('🔧 __dirname:', __dirname);
+}
 const result = dotenv.config({ path: envPath });
 if (result.error) {
-  console.error('❌ dotenv error:', result.error);
+  if (process.env.NODE_ENV !== 'production') console.error('❌ dotenv error:', result.error);
 } else {
-  console.log('✅ dotenv loaded, DATABASE_URL exists:', !!process.env.DATABASE_URL);
+  if (process.env.NODE_ENV !== 'production') console.log('✅ dotenv loaded, DATABASE_URL exists:', !!process.env.DATABASE_URL);
 }
 
 import express from 'express';
@@ -25,6 +27,7 @@ import { setupSocketHandlers } from './socket';
 import { errorHandler } from './middleware/errorHandler';
 import { rateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
+import { logger } from './lib/logger';
 import { seedDatabase } from './lib/seed';
 
 // Routes
@@ -124,37 +127,37 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
   try {
     await seedDatabase(prisma);
   } catch (err) {
-    console.error('❌ Seed failed:', err);
+    logger.error('❌ Seed failed:', err);
     // Continue starting server — don't block startup on seed errors
   }
 
   httpServer.listen(PORT, () => {
-    console.log(`🛺 TriQ Server running on port ${PORT}`);
-    console.log(`📡 Socket.io ready`);
-    console.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'not configured'}`);
+    logger.log(`🛺 TriQ Server running on port ${PORT}`);
+    logger.log(`📡 Socket.io ready`);
+    logger.log(`🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'not configured'}`);
     const webDistPath = path.resolve(__dirname, '../../web/dist');
     if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
-      console.log(`🌐 Frontend PWA served at root /`);
+      logger.log(`🌐 Frontend PWA served at root /`);
     } else {
-      console.log(`⚠️  Frontend PWA not built yet (run: npm run build -w apps/web)`);
+      logger.log(`⚠️  Frontend PWA not built yet (run: npm run build -w apps/web)`);
     }
   });
 })();
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received. Closing server...');
+  logger.log('SIGTERM received. Closing server...');
   httpServer.close(() => {
-    console.log('HTTP server closed');
+    logger.log('HTTP server closed');
   });
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('SIGINT received. Closing server...');
+  logger.log('SIGINT received. Closing server...');
   httpServer.close(() => {
-    console.log('HTTP server closed');
+    logger.log('HTTP server closed');
   });
   await prisma.$disconnect();
   process.exit(0);
