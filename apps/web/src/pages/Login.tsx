@@ -200,7 +200,7 @@ export default function Login() {
           <span className="text-triq-yellow">Tri</span>
           <span className="text-triq-cyan">Q</span>
         </h1>
-        <p className="text-triq-light text-sm mt-2 text-center leading-relaxed">
+        <p className="text-gray-300 text-sm mt-2 text-center leading-relaxed">
           Tricycle Booking in Digos City<br />
           <span className="text-triq-cyan/70">Padulong na! Booking made easy.</span>
         </p>
@@ -214,7 +214,7 @@ export default function Login() {
         {step === 'phone' && (
           <div className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-triq-light uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
                 Mobile Number
               </label>
               <input
@@ -223,10 +223,10 @@ export default function Login() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+63 912 345 6789"
-                className="w-full h-12 px-4 rounded-xl bg-triq-dark border border-triq-light/30 text-white placeholder-triq-light/50 text-base
+                className="w-full h-12 px-4 rounded-xl bg-triq-dark border border-triq-light/30 text-white placeholder-gray-500 text-base
                   focus:border-triq-cyan focus:ring-2 focus:ring-triq-cyan/20 focus:outline-none transition-all"
               />
-              <p className="text-[11px] text-triq-light/50 mt-1.5">
+              <p className="text-[11px] text-gray-400 mt-1.5">
                 We'll send a 6-digit verification code
               </p>
             </div>
@@ -255,7 +255,7 @@ export default function Login() {
             {/* Divider */}
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-triq-light/20" />
-              <span className="text-[11px] text-triq-light/40 font-medium uppercase tracking-wider">or</span>
+              <span className="text-[11px] text-gray-500 font-medium uppercase tracking-wider">or</span>
               <div className="flex-1 h-px bg-triq-light/20" />
             </div>
 
@@ -282,7 +282,7 @@ export default function Login() {
         {step === 'otp' && (
           <div className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-triq-light uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
                 Verification Code
               </label>
               <input
@@ -292,10 +292,10 @@ export default function Login() {
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="123456"
                 maxLength={6}
-                className="w-full h-12 px-4 rounded-xl bg-triq-dark border border-triq-light/30 text-white placeholder-triq-light/50 text-center text-lg font-mono tracking-[0.5em]
+                className="w-full h-12 px-4 rounded-xl bg-triq-dark border border-triq-light/30 text-white placeholder-gray-500 text-center text-lg font-mono tracking-[0.5em]
                   focus:border-triq-cyan focus:ring-2 focus:ring-triq-cyan/20 focus:outline-none transition-all"
               />
-              <p className="text-[11px] text-triq-light/50 mt-1.5 text-center">
+              <p className="text-[11px] text-gray-400 mt-1.5 text-center">
                 Sent to {phone}
               </p>
             </div>
@@ -323,7 +323,7 @@ export default function Login() {
 
             <button
               onClick={() => setStep('phone')}
-              className="w-full text-sm text-triq-light/60 hover:text-triq-cyan transition-colors py-1"
+              className="w-full text-sm text-gray-400 hover:text-triq-cyan transition-colors py-1"
             >
               Change phone number
             </button>
@@ -334,12 +334,12 @@ export default function Login() {
           <div className="space-y-5">
             <div className="text-center">
               <h2 className="text-lg font-bold text-white">Kinsa ka?</h2>
-              <p className="text-sm text-triq-light/60 mt-1">Select your role to continue</p>
+              <p className="text-sm text-gray-400 mt-1">Select your role to continue</p>
             </div>
 
             {needsPhone && (
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-triq-light uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
                   Phone Number <span className="text-triq-yellow">*</span>
                 </label>
                 <input
@@ -348,10 +348,10 @@ export default function Login() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+63 912 345 6789"
-                  className="w-full h-12 px-4 rounded-xl bg-triq-dark border border-triq-light/30 text-white placeholder-triq-light/50 text-base
+                  className="w-full h-12 px-4 rounded-xl bg-triq-dark border border-triq-light/30 text-white placeholder-gray-500 text-base
                     focus:border-triq-cyan focus:ring-2 focus:ring-triq-cyan/20 focus:outline-none transition-all"
                 />
-                <p className="text-[11px] text-triq-light/50">Required for ride bookings</p>
+                <p className="text-[11px] text-gray-400">Required for ride bookings</p>
               </div>
             )}
 
@@ -379,9 +379,9 @@ export default function Login() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-white font-semibold text-sm">{r.label}</div>
-                    <div className="text-xs text-triq-light/50 truncate">{r.description}</div>
+                    <div className="text-xs text-gray-400 truncate">{r.description}</div>
                   </div>
-                  <svg className="w-4 h-4 text-triq-light/30 group-hover:text-triq-cyan transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-4 h-4 text-gray-500 group-hover:text-triq-cyan transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
