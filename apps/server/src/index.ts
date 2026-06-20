@@ -1,10 +1,9 @@
 import dotenv from 'dotenv';
 import path from 'path';
+
 // Load environment variables FIRST — before any imports that create PrismaClient
-// Use __dirname so it works regardless of CWD (PM2 sets CWD to dist/)
-const envPath = process.env.NODE_ENV === 'production'
-  ? path.resolve(__dirname, '..', '.env')
-  : path.resolve(__dirname, '..', '..', '.env.local');
+// __dirname in compiled CommonJS points to dist/, so go up one level to project root
+const envPath = path.join(__dirname, '..', '.env');
 console.log('🔧 Loading .env from:', envPath);
 console.log('🔧 __dirname:', __dirname);
 const result = dotenv.config({ path: envPath });
