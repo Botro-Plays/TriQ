@@ -1,10 +1,14 @@
+import dotenv from 'dotenv';
+// Load environment variables FIRST — before any imports that create PrismaClient
+const envPath = process.env.NODE_ENV === 'production' ? '.env' : '.env.local';
+dotenv.config({ path: envPath });
+
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
@@ -22,10 +26,6 @@ import rideRoutes from './routes/ride';
 import tipRoutes from './routes/tip';
 import adminRoutes from './routes/admin';
 import reportRoutes from './routes/report';
-
-// Load environment variables
-const envPath = process.env.NODE_ENV === 'production' ? '.env' : '.env.local';
-dotenv.config({ path: envPath });
 
 const app = express();
 const httpServer = createServer(app);
