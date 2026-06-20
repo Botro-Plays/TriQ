@@ -112,8 +112,10 @@ if (process.env.NODE_ENV === 'production' && fs.existsSync(webDistPath)) {
     return (_req: express.Request, res: express.Response) => {
       if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
       if (contentType) res.setHeader('Content-Type', contentType);
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      res.sendFile(filePath);
+      // Read file and send with explicit Content-Length to avoid chunked encoding
+      const fileContent = fs.readFileSync(filePath);
+      res.setHeader('Content-Length', fileContent.length);
+      res.send(fileContent);
     };
   };
 
@@ -121,8 +123,9 @@ if (process.env.NODE_ENV === 'production' && fs.existsSync(webDistPath)) {
   app.get('/assets/*', (req, res) => {
     const filePath = path.join(webDistPath, 'assets', (req.params as any)[0]);
     if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    res.sendFile(filePath);
+    const fileContent = fs.readFileSync(filePath);
+    res.setHeader('Content-Length', fileContent.length);
+    res.send(fileContent);
   });
 
   // Root-level static files
@@ -131,16 +134,21 @@ if (process.env.NODE_ENV === 'production' && fs.existsSync(webDistPath)) {
   app.get('/registerSW.js', serveStatic('registerSW.js', 'application/javascript'));
   app.get('/sw.js', serveStatic('sw.js', 'application/javascript'));
   app.get('/workbox-:hash.js', (req, res) => {
+    const filePath = path.join(webDistPath, `workbox-${req.params.hash}.js`);
+    if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
+    const fileContent = fs.readFileSync(filePath);
     res.setHeader('Content-Type', 'application/javascript');
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    res.sendFile(path.join(webDistPath, `workbox-${req.params.hash}.js`));
+    res.setHeader('Content-Length', fileContent.length);
+    res.send(fileContent);
   });
   app.get('/logo-tricycle.png', serveStatic('logo-tricycle.png', 'image/png'));
 
   // React Router catch-all: serve index.html for non-API routes
   app.get('*', (_req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(webDistPath, 'index.html'));
+    const filePath = path.join(webDistPath, 'index.html');
+    const fileContent = fs.readFileSync(filePath);
+    res.setHeader('Content-Length', fileContent.length);
+    res.send(fileContent);
   });
 } else {
   // 404 handler (dev mode or web not built yet)
