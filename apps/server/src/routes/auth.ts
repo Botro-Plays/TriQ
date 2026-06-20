@@ -114,11 +114,13 @@ router.post('/verify-token', async (req, res) => {
   }
 });
 
-// GET /api/v1/auth/owner-exists — check if owner account already exists
+// GET /api/v1/auth/owner-exists — check if owner account is already claimed
 router.get('/owner-exists', async (_req, res) => {
   try {
     const owner = await prisma.user.findFirst({ where: { role: 'OWNER' } });
-    res.json({ exists: !!owner, claimed: owner ? owner.firebaseUid !== 'OWNER_PENDING' : false });
+    // ownerClaimed = true when owner exists AND firebaseUid is not the pending placeholder
+    const ownerClaimed = owner ? owner.firebaseUid !== 'OWNER_PENDING' : false;
+    res.json({ ownerClaimed });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to check owner status' });
   }

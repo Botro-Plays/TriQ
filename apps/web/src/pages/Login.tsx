@@ -21,20 +21,20 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [needsPhone, setNeedsPhone] = useState(false);
-  const [ownerExists, setOwnerExists] = useState(true); // Default hide until checked
+  const [ownerClaimed, setOwnerClaimed] = useState(true); // Default hide until checked
   const confirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const setAuth = useAuthStore((s) => s.setAuth);
   const navigate = useNavigate();
 
-  // Check if owner already exists to hide the OWNER role option
+  // Check if owner is already claimed to hide the OWNER role option
   useEffect(() => {
     api.get('/auth/owner-exists')
-      .then((res) => setOwnerExists(res.data.exists))
-      .catch(() => setOwnerExists(true)); // Fail-safe: hide OWNER on error
+      .then((res) => setOwnerClaimed(res.data.ownerClaimed))
+      .catch(() => setOwnerClaimed(true)); // Fail-safe: hide OWNER on error
   }, []);
 
-  const availableRoles = ownerExists
+  const availableRoles = ownerClaimed
     ? ROLES.filter((r) => r.value !== 'OWNER')
     : ROLES;
 
