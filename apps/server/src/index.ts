@@ -43,7 +43,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.WEB_APP_URL || 'http://localhost:5173',
+    origin: process.env.WEB_APP_URL || true,
     credentials: true,
   },
 });
@@ -60,7 +60,7 @@ if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPat
 
 // Middleware (minimal to avoid HTTP/2 proxy issues)
 app.use(cors({
-  origin: process.env.WEB_APP_URL || 'http://localhost:5173',
+  origin: process.env.WEB_APP_URL || true,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
