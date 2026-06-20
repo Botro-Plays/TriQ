@@ -17,7 +17,7 @@ const ROLES: { label: string; value: UserRole; description: string; icon: string
 function TriQLogo({ className = '' }: { className?: string }) {
   return (
     <img
-      src="/logo-tricycle.png"
+      src="/logo-tricycle.png?v=2"
       alt="TriQ Tricycle"
       className={`object-contain rounded-full ${className}`}
       draggable={false}
