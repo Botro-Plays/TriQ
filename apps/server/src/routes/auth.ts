@@ -75,7 +75,7 @@ router.post('/verify-token', async (req, res) => {
         }
       }
 
-      const newRole = role === 'DRIVER' ? 'DRIVER' : role === 'OWNER' ? 'OWNER' : role === 'STAFF' ? 'STAFF' : 'PASSENGER';
+      const newRole = role === 'DRIVER' ? 'DRIVER' : role === 'OWNER' ? 'OWNER' : 'PASSENGER';
       const createData: any = {
         firebaseUid,
         phoneNumber,
@@ -129,6 +129,16 @@ router.get('/owner-exists', async (_req, res) => {
     res.json({ ownerClaimed });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to check owner status' });
+  }
+});
+
+// GET /api/v1/auth/staff-exists — check if any staff users exist
+router.get('/staff-exists', async (_req, res) => {
+  try {
+    const staff = await prisma.user.findFirst({ where: { role: 'STAFF' } });
+    res.json({ staffExists: !!staff });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to check staff status' });
   }
 });
 

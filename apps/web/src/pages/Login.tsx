@@ -34,6 +34,7 @@ export default function Login() {
   const [shakeError, setShakeError] = useState(false);
   const [needsPhone, setNeedsPhone] = useState(false);
   const [ownerClaimed, setOwnerClaimed] = useState(true);
+  const [staffExists, setStaffExists] = useState(false);
   const confirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -43,6 +44,9 @@ export default function Login() {
     api.get('/auth/owner-exists')
       .then((res) => setOwnerClaimed(res.data.ownerClaimed))
       .catch(() => setOwnerClaimed(true));
+    api.get('/auth/staff-exists')
+      .then((res) => setStaffExists(res.data.staffExists))
+      .catch(() => setStaffExists(false));
   }, []);
 
   const showError = (msg: string) => {
@@ -51,9 +55,9 @@ export default function Login() {
     setTimeout(() => setShakeError(false), 500);
   };
 
-  const availableRoles = ownerClaimed
-    ? ROLES.filter((r) => r.value !== 'OWNER')
-    : ROLES;
+  const availableRoles = ROLES
+    .filter((r) => ownerClaimed || r.value !== 'OWNER')
+    .filter((r) => staffExists || r.value !== 'STAFF');
 
   const isPhoneValid = phone.replace('+63', '').replace(/\D/g, '').length >= 10;
 
