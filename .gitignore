@@ -4,9 +4,13 @@ node_modules/
 .pnp.js
 
 # Build outputs
-dist/
 build/
 *.tsbuildinfo
+# dist/ is ignored by default, but we commit production builds for HidenCloud
+# Specific exceptions below (managed by CI workflow)
+dist/
+!apps/web/dist/
+!apps/server/dist/
 
 # Environment files
 .env
