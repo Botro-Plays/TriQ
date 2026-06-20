@@ -1,7 +1,9 @@
 # TriQ — Tricycle Hailing Platform for Digos City
 
 [![Node.js](https://img.shields.io/badge/Node-20+-green)](https://nodejs.org/)
-[![MySQL](https://img.shields.io/badge/Database-MySQL-blue)](https://www.mysql.com/)
+[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-blue)](https://www.postgresql.org/)
+[![Render](https://img.shields.io/badge/Host-Render-463E56)](https://render.com)
+[![Supabase](https://img.shields.io/badge/DB-Supabase-3ECF8E)](https://supabase.com)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
 TriQ is a real-time, geo-location based tricycle hailing platform built specifically for **Digos City, Davao del Sur, Philippines**. Passengers book rides, drivers accept them, and the platform operates on cash payments with optional digital tips.
@@ -11,10 +13,10 @@ TriQ is a real-time, geo-location based tricycle hailing platform built specific
 ```
 TriQ-Project-New/
 ├── apps/
-│   ├── server/          # Node.js + Express + Prisma + MySQL backend + Socket.io
+│   ├── server/          # Node.js + Express + Prisma + PostgreSQL backend + Socket.io
 │   └── web/             # React + Vite PWA — unified app for all roles
 ├── docs/planning/       # Product specs, data model, branding, infrastructure
-└── .github/workflows/    # CI/CD automation
+└── .github/workflows/    # CI build check
 ```
 
 ## Tech Stack
@@ -22,9 +24,10 @@ TriQ-Project-New/
 | Layer | Technology |
 |---|---|
 | **Backend** | Node.js 20, Express, TypeScript, Prisma ORM |
-| **Database** | MySQL (via HidenCloud) |
+| **Database** | PostgreSQL (Supabase) |
+| **Hosting** | Render (free tier) |
 | **Real-time** | Socket.io |
-| **Auth** | Firebase Phone OTP |
+| **Auth** | Firebase Phone OTP + Google Sign-in |
 | **Payments** | PayMongo (tips only) |
 | **Frontend** | React 18, Vite, Tailwind CSS, React Router v6, Zustand |
 | **Maps** | Leaflet + OpenStreetMap |
@@ -52,8 +55,8 @@ cd TriQ
 npm install
 
 # 3. Set up environment
-cp apps/server/.env.example apps/server/.env.local
-# Edit apps/server/.env.local with your MySQL credentials
+cp apps/server/.env.example apps/server/.env
+# Edit apps/server/.env with your PostgreSQL credentials
 
 # 4. Generate Prisma client + migrate
 npm run db:generate
@@ -77,39 +80,47 @@ npm run dev:web      # http://localhost:5173
 | `npm run db:studio` | Open Prisma Studio |
 | `npm run build` | Build server + web for production |
 
-## Deployment (HidenCloud)
+## Deployment (Render + Supabase)
 
-**Platform:** [HidenCloud](https://www.hidencloud.com) Free Tier  
-**Reverse Proxy:** `https://triq.hidenplay.net`  
-**Domain:** `triq.dpdns.org` (DigitalPlat)
+**Hosting:** [Render](https://render.com) Free Tier  
+**Database:** [Supabase](https://supabase.com) Free Tier (PostgreSQL)  
+**Domain:** `https://triq.dpdns.org` (Cloudflare DNS-only)
 
-### HidenCloud Egg Config
+### Render Web Service Config
 
 | Setting | Value |
 |---|---|
-| Git Repo Address | `https://github.com/Botro-Plays/TriQ` |
-| Install Branch | `main` |
-| Auto Update | `1` |
-| Main file | `apps/server/index.js` |
+| Repository | `https://github.com/Botro-Plays/TriQ` |
+| Branch | `main` |
+| Root Directory | `apps/server` |
+| Build Command | `npm install --include=dev && cd ../web && npm install --include=dev && npm run build && cd ../server && npx prisma generate && npm run build` |
+| Start Command | `npm start` |
+| Health Check | `/health` |
+| Auto-Deploy | On Commit |
 
-The entry point (`apps/server/index.js`) auto-handles:
-1. `npm install` (workspace-aware)
-2. `prisma generate`
-3. `tsc` build
-4. Start the server
+### Environment Variables on Render
 
-### Required Environment Variables
+| Key | Value |
+|---|---|
+| `DATABASE_URL` | `postgresql://postgres.mzyajzfatmrwzdjmhqnm:PASSWORD@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres` |
+| `NODE_ENV` | `production` |
+| `JWT_SECRET` | (base64-encoded random secret) |
+| `FIREBASE_PROJECT_ID` | `triq-35908` |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | `/etc/secrets/firebase-service-account.json` |
 
-```bash
-NODE_ENV=production
-PORT=4000
-DATABASE_URL=mysql://user:pass@localhost:3306/triq
-WEB_APP_URL=https://triq.hidenplay.net
-JWT_SECRET=your-32-char-random-secret
-FIREBASE_PROJECT_ID=triq-digos
-PAYMONGO_SECRET_KEY=sk_test_xxx
-PAYMONGO_PUBLIC_KEY=pk_test_xxx
-```
+### Secret File on Render
+
+Firebase service account JSON is stored as a Render Secret File at `/etc/secrets/firebase-service-account.json`.
+
+### Database Migrations
+
+Migrations are run manually via the Supabase SQL Editor (Render cannot reach Supabase's direct IPv6 connection during build). The migration SQL file is at `apps/server/prisma/migrations/20260620000000_init/migration.sql`.
+
+### Notes
+
+- Render free tier spins down after 15 min of inactivity (cold start ~30s)
+- Supabase free tier: 500MB database, IPv6 direct connection (use session pooler for IPv4)
+- Cloudflare DNS is set to DNS-only (not proxied) to avoid WebSocket/HTTP2 issues
 
 ## Project Principles
 

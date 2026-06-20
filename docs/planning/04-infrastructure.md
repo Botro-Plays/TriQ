@@ -1,265 +1,157 @@
-# TriQ — Infrastructure & VPS Deployment (Actual)
+# TriQ — Infrastructure & Deployment (Render + Supabase)
 
-## VPS Specifications
+## Current Setup
+
 | Resource | Value |
 |----------|-------|
-| **Provider** | User's spare VPS |
-| **Public IP** | `72.51.57.201` |
-| **Domain** | `triq.dpdns.org` |
-| **CPU** | 8 vCPU |
-| **RAM** | 16 GB |
-| **Storage** | 80 GB NVMe SSD |
-| **OS** | Ubuntu Server 24.04 LTS amd64 |
-
-This is **more than sufficient** for launch and moderate growth.
+| **Hosting** | Render (Free Tier) |
+| **Database** | Supabase PostgreSQL (Free Tier, 500MB) |
+| **Domain** | `triq.dpdns.org` (Cloudflare DNS-only) |
+| **Render URL** | `https://triq-0h54.onrender.com` |
+| **Supabase Project** | `mzyajzfatmrwzdjmhqnm` |
+| **Supabase Region** | ap-northeast-2 (Seoul) |
+| **Node.js** | 24.x (Render default) |
 
 ---
 
-## 1. OS Setup (Ubuntu 24.04)
+## 1. Render Web Service
 
-### Initial Server Hardening
-```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
+### Configuration
 
-# Create non-root user
-sudo adduser triq
-sudo usermod -aG sudo triq
+| Setting | Value |
+|---|---|
+| Repository | `https://github.com/Botro-Plays/TriQ` |
+| Branch | `main` |
+| Root Directory | `apps/server` |
+| Build Command | `npm install --include=dev && cd ../web && npm install --include=dev && npm run build && cd ../server && npx prisma generate && npm run build` |
+| Start Command | `npm start` |
+| Health Check Path | `/health` |
+| Auto-Deploy | On Commit |
 
-# Enable UFW firewall
-sudo ufw allow OpenSSH
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
+### Environment Variables
 
-# Set timezone to Asia/Manila
-sudo timedatectl set-timezone Asia/Manila
-```
+| Key | Value |
+|---|---|
+| `DATABASE_URL` | `postgresql://postgres.mzyajzfatmrwzdjmhqnm:PASSWORD@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres` |
+| `NODE_ENV` | `production` |
+| `JWT_SECRET` | (base64-encoded random secret) |
+| `FIREBASE_PROJECT_ID` | `triq-35908` |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | `/etc/secrets/firebase-service-account.json` |
 
-### Install Core Dependencies
-```bash
-# Node.js (LTS v20)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
+### Secret File
 
-# Verify
-node -v   # Should show v20.x.x
-npm -v
-
-# Nginx
-sudo apt install -y nginx
-
-# MySQL
-sudo apt install -y mysql-server
-sudo mysql_secure_installation
-
-# PM2 (Node.js process manager)
-sudo npm install -g pm2
-pm2 startup systemd
-
-# Git
-sudo apt install -y git
-git --version
-```
+Firebase service account JSON stored as a Render Secret File:
+- **Filename:** `firebase-service-account.json`
+- **Mounted at:** `/etc/secrets/firebase-service-account.json`
 
 ---
 
-## 2. MySQL Database Setup
+## 2. Supabase Database
 
-```bash
-# Login as root
-sudo mysql
+### Connection
 
-# Create database and user
-CREATE DATABASE triq_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'triq'@'localhost' IDENTIFIED BY 'your_password';
-GRANT ALL PRIVILEGES ON triq_db.* TO 'triq'@'localhost';
-FLUSH PRIVILEGES;
-EXIT;
-```
+Supabase free tier uses **IPv6-only** for direct connections. Use the **Session Pooler** for IPv4 connectivity:
 
-**Important**: If the password contains special characters (`@`, `%`, `!`), URL-encode them in `DATABASE_URL`:
-```
-DATABASE_URL=mysql://triq:password%40%21@localhost:3306/triq_db
-```
+- **Direct (IPv6):** `db.mzyajzfatmrwzdjmhqnm.supabase.co:5432` — does not work from Render
+- **Session Pooler (IPv4):** `aws-1-ap-northeast-2.pooler.supabase.com:5432` — works from Render
 
----
+**Important:** URL-encode special characters in the password (`!` → `%21`, `@` → `%40`).
 
-## 3. Directory Structure
+### Migrations
 
-```
-/var/www/
-├── triq/                    # Frontend static files (from web build)
-│   ├── index.html
-│   ├── assets/
-│   └── ...
-├── triq-server/             # Backend code
-│   ├── dist/                # Compiled server
-│   ├── prisma/
-│   │   ├── schema.prisma
-│   │   ├── seed.ts
-│   │   └── migrations/      # SQL migration files
-│   ├── config/              # Firebase service account JSON
-│   │   └── triq-35908-firebase-adminsdk-....json
-│   ├── package.json
-│   └── .env                 # NOT in git — manually created
-└── web/
-    └── dist/ -> /var/www/triq/   # Symlink for server static serving
-```
+Migrations are run **manually** via the Supabase SQL Editor:
+1. Go to Supabase Dashboard → SQL Editor
+2. Paste the migration SQL from `apps/server/prisma/migrations/20260620000000_init/migration.sql`
+3. Click **Run without RLS** (Prisma uses direct database access, not Supabase client libraries)
+
+The migration SQL includes `_prisma_migrations` table tracking so Prisma knows the migration was applied.
 
 ---
 
-## 4. Nginx Configuration
+## 3. Cloudflare DNS
 
-`/etc/nginx/sites-available/triq.dpdns.org`:
-```nginx
-server {
-    listen 80;
-    server_name triq.dpdns.org;
+| Record | Type | Value | Proxy |
+|--------|------|-------|-------|
+| `triq.dpdns.org` | CNAME | `triq-0h54.onrender.com` | DNS only |
+| `www.triq.dpdns.org` | CNAME | `triq-0h54.onrender.com` | DNS only |
 
-    # Frontend static files
-    location / {
-        root /var/www/triq;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
+**DNS-only (grey cloud)** is required — Cloudflare proxy interferes with WebSocket/Socket.io connections.
 
-    # API proxy
-    location /api/ {
-        proxy_pass http://localhost:4000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_cache_bypass $http_upgrade;
-    }
+---
 
-    # Socket.io WebSocket support
-    location /socket.io/ {
-        proxy_pass http://localhost:4000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_read_timeout 86400;
-    }
-}
+## 4. Build & Deploy Flow
+
 ```
-
-Enable the site:
-```bash
-sudo ln -s /etc/nginx/sites-available/triq.dpdns.org /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
+Developer machine
+       │
+       ▼
+  Git push to main
+       │
+       ├── GitHub Actions CI (build check only)
+       │
+       ▼
+  Render Auto-Deploy
+       │
+       ├── npm install --include=dev (server)
+       ├── npm install --include=dev (web)
+       ├── npm run build (web — tsc + vite)
+       ├── npx prisma generate
+       ├── npm run build (server — tsc)
+       │
+       ▼
+  npm start (node dist/index.js)
+       │
+       ├── Firebase Admin init
+       ├── Database seed (idempotent upsert)
+       ├── Express server on 0.0.0.0:10000
+       └── Socket.io ready
+       │
+       ▼
+  Live on https://triq.dpdns.org
 ```
 
 ---
 
-## 5. SSL / HTTPS (Cloudflare)
+## 5. Free Tier Limitations
 
-We use **Cloudflare** for SSL — no Let's Encrypt needed on the VPS.
-
-1. Add `triq.dpdns.org` A record → `72.51.57.201` in Cloudflare DNS
-2. Set SSL/TLS mode to **Flexible**
-3. Enable **Proxied** (orange cloud)
-
-**Important**: Disable IPv6 on the VPS if Cloudflare returns 521 errors:
-```bash
-sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-```
+| Platform | Limitation | Impact |
+|----------|-----------|--------|
+| Render | Spins down after 15 min inactivity | Cold start ~30s on first request |
+| Supabase | 500MB database | Sufficient for launch |
+| Supabase | IPv6-only direct connection | Must use session pooler for IPv4 |
+| Supabase | No daily backups (free tier) | Manual backups via SQL export |
 
 ---
 
-## 6. PM2 Process Management
-
-```bash
-# Start server with PM2
-pm2 start /var/www/triq-server/dist/index.js --name triq-server
-
-# Save PM2 config to auto-start on boot
-pm2 save --force
-pm2 startup systemd
-
-# Useful commands
-pm2 list                    # Show running processes
-pm2 logs triq-server        # View logs
-pm2 restart triq-server   # Restart
-pm2 stop triq-server       # Stop
-pm2 delete triq-server     # Remove
-```
-
----
-
-## 7. Environment Variables
-
-Create `/var/www/triq-server/.env`:
-```env
-NODE_ENV=production
-PORT=4000
-DATABASE_URL=mysql://triq:password@localhost:3306/triq_db
-JWT_SECRET=your_random_64_char_string
-WEB_APP_URL=https://triq.dpdns.org
-FIREBASE_PROJECT_ID=triq-35908
-FIREBASE_SERVICE_ACCOUNT_PATH=./config/triq-35908-firebase-adminsdk-fbsvc-7756d8a28a.json
-```
-
-**Generate JWT secret** (Node.js):
-```bash
-node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
-```
-
----
-
-## 8. Backup Strategy
-
-### MySQL Backups
-```bash
-# Daily automated backup via cron
-crontab -e
-# Add: 0 2 * * * mysqldump -u triq -p'password' triq_db | gzip > /backups/triq-$(date +\%Y\%m\%d).sql.gz
-
-# Retain 30 days
-0 3 * * * find /backups -name "*.sql.gz" -mtime +30 -delete
-```
-
-### What to Backup
-| Data | Frequency | Destination |
-|------|-----------|-------------|
-| MySQL DB | Daily | VPS local + optional remote |
-| `config/` (Firebase JSON) | Once | Copy to local safe storage |
-| `.env` | Once | Copy to password manager |
-| Application code | Every deploy | GitHub is source of truth |
-
----
-
-## 9. Monitoring
+## 6. Monitoring
 
 | Tool | Purpose | Cost |
 |------|---------|------|
-| `pm2 logs` | Application logs | Free |
-| `pm2 monit` | Real-time process monitor | Free |
-| Nginx access logs | Request tracking | Free |
-| `htop` / `free -h` | Resource monitoring | Free |
-| Cloudflare Analytics | Traffic + security | Free |
-| Uptime Kuma (future) | Uptime monitoring | Free |
+| Render Dashboard | Deploy logs, events | Free |
+| Render Health Check | Auto-restart on failure | Free |
+| Supabase Dashboard | DB metrics, query logs | Free |
+| `curl https://triq.dpdns.org/health` | Manual health check | Free |
 
 ---
 
-## 10. Troubleshooting
-
-### Cloudflare 521 (Web Server Down)
-- Check IPv6 is disabled: `curl -s ifconfig.me` should show IPv4
-- Check nginx: `sudo systemctl status nginx`
-- Check server: `pm2 list`
+## 7. Troubleshooting
 
 ### Database Connection Errors
-- Verify `.env` `DATABASE_URL` is correct
-- Check MySQL user permissions: `SHOW GRANTS FOR 'triq'@'localhost';`
-- Check MySQL running: `sudo systemctl status mysql`
+- Verify `DATABASE_URL` uses the **session pooler** URL (not direct)
+- Check password special characters are URL-encoded
+- Ensure Supabase project status is **Healthy**
 
-### Prisma Migration Failures
-- Ensure `prisma/migrations/` exists in deployed code
-- Run manually: `npx prisma migrate deploy`
-- Check shadow database permissions if `migrate dev` fails
+### Build Failures on Render
+- Check Render build logs for TypeScript errors
+- Ensure `--include=dev` is in both `npm install` commands (devDependencies needed for `tsc`)
+- Verify `tsconfig.json` doesn't use deprecated `baseUrl` without `paths`
+
+### PWA / Service Worker Issues
+- Old service workers from previous deployments may cache stale responses
+- Clear browser cache: DevTools → Application → Service Workers → Unregister
+- The PWA is configured with `selfDestroying: true` to auto-clean stale service workers
+
+### Cold Start Delays
+- Render free tier spins down after 15 min of inactivity
+- First request after idle takes ~30s to cold-start
+- Consider upgrading to Render paid tier ($7/mo) for always-on

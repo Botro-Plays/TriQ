@@ -1,4 +1,4 @@
-# TriQ — CI/CD Pipeline & Deployment (Actual)
+# TriQ — CI/CD Pipeline & Deployment (Render + Supabase)
 
 ## Git Repository Structure
 
@@ -6,125 +6,54 @@
 TriQ-Project-New/
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml              # Build verification (lint + typecheck)
-│       └── deploy-vps.yml      # Build, package, deploy to VPS
+│       └── ci.yml              # Build verification (lint + typecheck)
 ├── apps/
 │   ├── web/                    # React + Vite PWA (frontend)
 │   └── server/                 # Node.js + Express + TypeScript (backend)
 │       ├── src/
 │       ├── prisma/
-│       │   ├── schema.prisma
+│       │   ├── schema.prisma   # PostgreSQL schema
 │       │   ├── seed.ts
 │       │   └── migrations/     # Committed SQL migration files
-│       └── config/             # Firebase service account JSON (not in git)
+│       └── package.json
 ├── package.json                # Root workspace config
 └── README.md
 ```
 
 ---
 
-## CI/CD Pipeline
+## CI: GitHub Actions (Build Check Only)
 
-### GitHub Actions Workflow: Build & Deploy (`.github/workflows/deploy-vps.yml`)
+`.github/workflows/ci.yml` runs on every push to `main`:
 
-```yaml
-name: Build and Deploy to VPS
+1. Install dependencies (`npm ci`)
+2. Generate Prisma client
+3. Build web (`tsc && vite build`)
+4. Build server (`tsc`)
+5. Verify build artifacts exist
 
-on:
-  push:
-    branches: [main]
-
-jobs:
-  lint-and-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint server
-        run: npm run lint -w apps/server
-
-      - name: Lint web
-        run: npm run lint -w apps/web
-
-      - name: Build server
-        run: npm run build -w apps/server
-
-      - name: Build web
-        run: npm run build -w apps/web
-
-      - name: Package frontend
-        run: |
-          cd apps/web
-          tar -czf ../../deploy-web.tar.gz dist/
-
-      - name: Package backend
-        run: |
-          cd apps/server
-          tar -czf ../../deploy-server.tar.gz dist/ prisma/ package.json prisma/migrations/
-
-      - name: Upload packages to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "deploy-web.tar.gz,deploy-server.tar.gz"
-          target: "/tmp"
-
-      - name: Deploy and restart on VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            # Deploy frontend
-            rm -rf /var/www/triq/*
-            tar -xzf /tmp/deploy-web.tar.gz -C /var/www/triq --strip-components=1
-
-            # Deploy backend (preserve config/ and .env)
-            cd /var/www/triq-server
-            rm -rf dist prisma package.json node_modules package-lock.json
-            tar -xzf /tmp/deploy-server.tar.gz -C /var/www/triq-server
-
-            # Install dependencies and run migrations
-            cd /var/www/triq-server
-            npm install --production --omit=dev
-            ./node_modules/.bin/prisma generate
-            ./node_modules/.bin/prisma migrate deploy
-            ./node_modules/.bin/prisma db seed
-
-            # Restart PM2
-            pm2 delete triq-server || true
-            pm2 start dist/index.js --name triq-server --update-env
-            pm2 save --force
-
-            # Cleanup
-            rm -f /tmp/deploy-web.tar.gz /tmp/deploy-server.tar.gz
-```
+**Note:** CI does NOT deploy — it only verifies the build succeeds. Deployment is handled by Render's auto-deploy on commit.
 
 ---
 
-## Required GitHub Secrets
+## CD: Render Auto-Deploy
 
-Configure these in **GitHub → Settings → Secrets and variables → Actions**:
+Render watches the `main` branch. On every push:
 
-| Secret | Value |
-|--------|-------|
-| `VPS_HOST` | `72.51.57.201` |
-| `VPS_USER` | `triq` |
-| `VPS_SSH_KEY` | Private SSH key (no passphrase) |
-| `VPS_WEB_PATH` | `/var/www/triq` |
-| `VPS_SERVER_PATH` | `/var/www/triq-server` |
+1. Clone the repository
+2. Run the build command (installs deps, builds web + server, generates Prisma client)
+3. Start the server (`npm start`)
+4. Health check at `/health`
+
+### Build Command
+```
+npm install --include=dev && cd ../web && npm install --include=dev && npm run build && cd ../server && npx prisma generate && npm run build
+```
+
+### Start Command
+```
+npm start
+```
 
 ---
 
@@ -136,26 +65,23 @@ Developer machine
        ▼
   Git push to main
        │
-       ▼
-  GitHub Actions Runner
-       │
-       ├── Build server (tsc)
-       ├── Build web (vite)
-       ├── Package into tarballs
+       ├── GitHub Actions CI (build check only, runs in parallel)
        │
        ▼
-  SCP to VPS (/tmp)
+  Render Auto-Deploy
+       │
+       ├── npm install --include=dev (server deps)
+       ├── npm install --include=dev (web deps)
+       ├── npm run build (web — tsc + vite build)
+       ├── npx prisma generate (Prisma client)
+       ├── npm run build (server — tsc)
        │
        ▼
-  SSH into VPS
-       ├── Extract frontend → /var/www/triq
-       ├── Extract backend → /var/www/triq-server
-       ├── npm install --production
-       ├── prisma generate
-       ├── prisma migrate deploy (safe, never loses data)
-       ├── prisma db seed (safe upsert)
-       ├── pm2 restart triq-server
-       └── Cleanup tarballs
+  npm start (node dist/index.js)
+       │
+       ├── Firebase Admin init (from secret file)
+       ├── Database seed (idempotent upsert via Prisma)
+       ├── Express + Socket.io on 0.0.0.0:10000
        │
        ▼
   Live on https://triq.dpdns.org
@@ -163,92 +89,54 @@ Developer machine
 
 ---
 
-## Deployment Strategy
+## Database Migrations
 
-### Environments
+Migrations are **not run during Render build** because Supabase's direct connection is IPv6-only (unreachable from Render). Instead:
+
+1. Migration SQL files are committed to git (`apps/server/prisma/migrations/`)
+2. Migrations are applied **manually** via Supabase SQL Editor
+3. The migration SQL includes `_prisma_migrations` table tracking
+
+### Applying a New Migration
+
+1. Generate migration SQL locally:
+   ```bash
+   cd apps/server
+   npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script
+   ```
+2. Save to `prisma/migrations/YYYYMMDDHHMMSS_name/migration.sql`
+3. Paste the SQL into Supabase SQL Editor and run it
+4. Commit and push the migration file
+
+---
+
+## Environments
 
 | Environment | Purpose | Auto-deploy |
 |-------------|---------|-------------|
 | **Local** | Development | Manual (`npm run dev`) |
-| **Production** | Live app | On push to `main` |
+| **Production** | Live app on Render | On push to `main` |
 
-### Database Migrations
+---
 
-- **Migration files are committed to git** (`prisma/migrations/`)
-- `prisma migrate deploy` applies **only new** migrations
-- **Never deletes data** — additive changes only
-- `prisma db seed` uses `upsert` — safe to run repeatedly
-
-### Rollback Procedure
+## Rollback Procedure
 
 ```bash
-# Emergency rollback on VPS
-ssh triq@72.51.57.201
-
-# Option 1: Revert git and trigger new deploy
+# Option 1: Revert git commit and push (triggers Render redeploy)
 git revert HEAD
 git push origin main
 
-# Option 2: Manual DB rollback (if migration was bad)
-cd /var/www/triq-server
-npx prisma migrate resolve --rolled-back "20260619142931_init"
-
-# Option 3: Restore from MySQL backup
-# gunzip -c /backups/triq-20260115.sql.gz | mysql -u triq -p triq_db
+# Option 2: Manual deploy of specific commit on Render dashboard
+# Settings → Manual Deploy → Deploy specific commit
 ```
 
 ---
 
-## Backup & Disaster Recovery
-
-### MySQL Backup
-
-```bash
-# Automated daily backup via cron on VPS
-crontab -e
-# Add: 0 2 * * * mysqldump -u triq -p'password' triq_db | gzip > /backups/triq-$(date +\%Y\%m\%d).sql.gz
-
-# Retain 30 days
-0 3 * * * find /backups -name "*.sql.gz" -mtime +30 -delete
-```
-
-### Restore Procedure
-
-```bash
-# Stop PM2 to prevent writes
-pm2 stop triq-server
-
-# Restore from backup
-gunzip -c /backups/triq-20260115.sql.gz | mysql -u triq -p triq_db
-
-# Restart
-pm2 start triq-server
-```
-
----
-
-## Monitoring Post-Deploy
-
-### Health Checks
-
-```bash
-# API health
-curl https://triq.dpdns.org/api/v1
-
-# Check PM2 status
-pm2 list
-
-# Check logs
-pm2 logs triq-server --lines 20
-```
-
-### Post-Deploy Verification Checklist
+## Post-Deploy Verification Checklist
 
 - [ ] Website loads at `https://triq.dpdns.org`
-- [ ] API responds to `/api/v1`
-- [ ] Database migrations applied successfully
-- [ ] PM2 shows `triq-server` as `online`
-- [ ] Nginx serving static files
-- [ ] Cloudflare SSL active
-- [ ] Firebase Auth responding
-- [ ] No 500 errors in last 5 minutes
+- [ ] Health check responds: `curl https://triq.dpdns.org/health`
+- [ ] API responds: `curl https://triq.dpdns.org/api/v1/auth/owner-exists`
+- [ ] Render logs show "Server running" and "Database seed complete"
+- [ ] Firebase Auth working (test login)
+- [ ] No 500 errors in Render logs
