@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -93,14 +93,14 @@ model Passenger {
   id            String   @id @default(uuid())
   userId        String   @unique
   name          String
-  photoUrl      String?  @db.Text
-  homeLocation  String?  @db.Text
-  workLocation  String?  @db.Text
+  photoUrl      String?
+  homeLocation  String?
+  workLocation  String?
   emergencyContact String?
   kycStatus     KycStatus @default(UNVERIFIED)
   kycReviewedAt DateTime?
   kycReviewedBy String?
-  kycRejectionReason String? @db.Text
+  kycRejectionReason String?
   trustScore    Int      @default(100)
   autoCancelledCount Int  @default(0)
 
@@ -121,7 +121,7 @@ model Driver {
   id                String   @id @default(uuid())
   userId            String   @unique
   name              String
-  photoUrl          String?  @db.Text
+  photoUrl          String?
   plateNumber       String   @unique
   tricycleModel     String?
   status            DriverStatus @default(PENDING)
@@ -142,7 +142,7 @@ model Driver {
   kycStatus         KycStatus @default(PENDING_REVIEW)
   kycReviewedAt     DateTime?
   kycReviewedBy     String?
-  kycRejectionReason String? @db.Text
+  kycRejectionReason String?
 
   subscriptionTier  SubscriptionTier @default(FREE)
   subscriptionStatus SubscriptionStatus @default(ACTIVE)
@@ -179,7 +179,7 @@ model SavedPlace {
   id          String   @id @default(uuid())
   passengerId String
   label       String   // "Home", "Work", "Market"
-  address     String  @db.Text
+  address     String
   lat         Float
   lng         Float
   createdAt   DateTime @default(now())
@@ -195,10 +195,10 @@ model Ride {
 
   pickupLat     Float
   pickupLng     Float
-  pickupAddress String  @db.Text
+  pickupAddress String
   dropoffLat    Float
   dropoffLng    Float
-  dropoffAddress String  @db.Text
+  dropoffAddress String
 
   status          RideStatusEnum @default(REQUESTED)
   estimatedFare   Int      // in centavos
@@ -266,7 +266,7 @@ model Review {
   fromPassengerId String
   toDriverId  String
   rating      Int      // 1–5
-  comment     String? @db.Text
+  comment     String?
   thumbsUp    Boolean?
   createdAt   DateTime @default(now())
 
@@ -285,7 +285,7 @@ model Document {
   status      DocumentStatus @default(PENDING)
   reviewedBy  String?
   reviewedAt  DateTime?
-  rejectionReason String? @db.Text
+  rejectionReason String?
   createdAt   DateTime @default(now())
 
   passenger   Passenger? @relation(fields: [passengerId], references: [id])
@@ -376,9 +376,9 @@ model Report {
   reportedId  String   // passenger or driver user ID
   category    String
   severity    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
-  description String? @db.Text
+  description String?
   status      String   @default("PENDING") // PENDING, UNDER_REVIEW, RESOLVED, DISMISSED
-  resolution  String? @db.Text
+  resolution  String?
   resolvedBy  String?
   resolvedAt  DateTime?
   createdAt   DateTime @default(now())
@@ -477,7 +477,7 @@ model EmergencyEvent {
   status      String   @default("ACTIVE") // ACTIVE, RESOLVED, FALSE_ALARM
   resolvedAt  DateTime?
   resolvedBy  String?
-  notes       String? @db.Text
+  notes       String?
   createdAt   DateTime @default(now())
 
   ride        Ride     @relation(fields: [rideId], references: [id])
