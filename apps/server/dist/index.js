@@ -101,10 +101,42 @@ app.use('/api/v1/reports', report_1.default);
 app.use(errorHandler_1.errorHandler);
 // Serve built web app (PWA) static files
 const webDistPath = path_1.default.resolve(__dirname, '../../web/dist');
-if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
-    app.use(express_1.default.static(webDistPath));
+const fs = require('fs');
+if (process.env.NODE_ENV === 'production' && fs.existsSync(webDistPath)) {
+    // Explicit file serving — avoids HTTP/2 proxy issues with express.static etag/range handling
+    const serveStatic = (relativePath, contentType) => {
+        const filePath = path_1.default.join(webDistPath, relativePath);
+        return (_req, res) => {
+            if (!fs.existsSync(filePath))
+                return res.status(404).send('Not found');
+            if (contentType)
+                res.setHeader('Content-Type', contentType);
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            res.sendFile(filePath);
+        };
+    };
+    // Hashed assets in /assets/*
+    app.get('/assets/*', (req, res) => {
+        const filePath = path_1.default.join(webDistPath, 'assets', req.params[0]);
+        if (!fs.existsSync(filePath))
+            return res.status(404).send('Not found');
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.sendFile(filePath);
+    });
+    // Root-level static files
+    app.get('/favicon.svg', serveStatic('favicon.svg', 'image/svg+xml'));
+    app.get('/manifest.webmanifest', serveStatic('manifest.webmanifest', 'application/manifest+json'));
+    app.get('/registerSW.js', serveStatic('registerSW.js', 'application/javascript'));
+    app.get('/sw.js', serveStatic('sw.js', 'application/javascript'));
+    app.get('/workbox-:hash.js', (req, res) => {
+        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.sendFile(path_1.default.join(webDistPath, `workbox-${req.params.hash}.js`));
+    });
+    app.get('/logo-tricycle.png', serveStatic('logo-tricycle.png', 'image/png'));
     // React Router catch-all: serve index.html for non-API routes
     app.get('*', (_req, res) => {
+        res.setHeader('Cache-Control', 'no-cache');
         res.sendFile(path_1.default.join(webDistPath, 'index.html'));
     });
 }

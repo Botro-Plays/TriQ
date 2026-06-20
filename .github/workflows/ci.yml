@@ -31,13 +31,6 @@ jobs:
       - name: Generate Prisma Client
         run: npm run db:generate -w apps/server
 
-      - name: Deploy database migrations
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          cd apps/server
-          npx prisma migrate deploy || echo "Migration deploy failed, continuing..."
-
       - name: Build Web
         env:
           NODE_ENV: production
