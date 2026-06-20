@@ -58,6 +58,11 @@ jobs:
       - name: Build Web
         run: npm run build -w apps/web
 
+      - name: Install production deps for server
+        run: |
+          cd apps/server
+          npm install --production --omit=dev
+
       - name: Package frontend
         run: |
           cd apps/web
@@ -66,7 +71,7 @@ jobs:
       - name: Package backend
         run: |
           cd apps/server
-          tar -czf ../../deploy-server.tar.gz dist/ prisma/ package.json prisma/migrations/
+          tar -czf ../../deploy-server.tar.gz dist/ prisma/ package.json node_modules/ prisma/migrations/
 
       - name: Upload packages to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -93,10 +98,8 @@ jobs:
             rm -rf dist prisma package.json node_modules package-lock.json
             tar -xzf /tmp/deploy-server.tar.gz -C /var/www/triq-server
 
-            # Install dependencies and start server
+            # VPS is ready-to-go — just migrate DB and seed
             cd /var/www/triq-server
-            npm install --production --omit=dev
-            ./node_modules/.bin/prisma generate
             ./node_modules/.bin/prisma migrate deploy
             ./node_modules/.bin/prisma db seed
 
