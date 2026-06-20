@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import { auth, RecaptchaVerifier } from '../lib/firebase';
@@ -21,10 +21,22 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [needsPhone, setNeedsPhone] = useState(false);
+  const [ownerExists, setOwnerExists] = useState(true); // Default hide until checked
   const confirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const setAuth = useAuthStore((s) => s.setAuth);
   const navigate = useNavigate();
+
+  // Check if owner already exists to hide the OWNER role option
+  useEffect(() => {
+    api.get('/auth/owner-exists')
+      .then((res) => setOwnerExists(res.data.exists))
+      .catch(() => setOwnerExists(true)); // Fail-safe: hide OWNER on error
+  }, []);
+
+  const availableRoles = ownerExists
+    ? ROLES.filter((r) => r.value !== 'OWNER')
+    : ROLES;
 
   const sendOtp = async () => {
     setError('');
@@ -240,7 +252,7 @@ export default function Login() {
           )}
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
           <div className="space-y-3">
-            {ROLES.map((r) => (
+            {availableRoles.map((r) => (
               <button
                 key={r.value}
                 onClick={() => selectRole(r.value)}

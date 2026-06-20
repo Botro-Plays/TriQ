@@ -20,12 +20,14 @@ router.post('/verify-token', async (req, res) => {
     let phoneNumber: string | undefined;
     let firebaseUid: string;
     let displayName: string | undefined;
+    let email: string | undefined;
 
     try {
       const firebaseUser = await verifyFirebaseToken(idToken);
       phoneNumber = firebaseUser.phone_number || req.body.phone;
       firebaseUid = firebaseUser.uid;
       displayName = firebaseUser.name || phoneNumber;
+      email = (firebaseUser as any).email || req.body.email;
     } catch (err: any) {
       console.warn('Firebase token verification failed:', err.message);
       res.status(401).json({ error: 'Invalid token' });
@@ -44,24 +46,38 @@ router.post('/verify-token', async (req, res) => {
     if (!user && phoneNumber) {
       const existingByPhone = await prisma.user.findUnique({ where: { phoneNumber } });
       if (existingByPhone) {
-        // Update firebaseUid to link this Google account to the existing user
+        // Check if this is the seeded owner being claimed
+        const isOwnerClaim = existingByPhone.role === 'OWNER' && existingByPhone.firebaseUid === 'OWNER_PENDING';
+        const updateData: any = { firebaseUid };
+        if (email) updateData.email = email;
+
         user = await prisma.user.update({
           where: { id: existingByPhone.id },
-          data: { firebaseUid },
+          data: updateData,
         });
-        console.log(`Linked Google account ${firebaseUid} to existing user ${user.id}`);
+        console.log(`${isOwnerClaim ? 'Owner claimed' : 'Linked Google account'} ${firebaseUid} to user ${user.id}`);
       }
     }
 
     if (!user) {
+      // Prevent anyone from creating a second OWNER
+      if (role === 'OWNER') {
+        const existingOwner = await prisma.user.findFirst({ where: { role: 'OWNER' } });
+        if (existingOwner) {
+          res.status(403).json({ error: 'Owner account already exists', code: 'OWNER_EXISTS' });
+          return;
+        }
+      }
+
       const newRole = role === 'DRIVER' ? 'DRIVER' : role === 'OWNER' ? 'OWNER' : role === 'STAFF' ? 'STAFF' : 'PASSENGER';
-      user = await prisma.user.create({
-        data: {
-          firebaseUid,
-          phoneNumber,
-          role: newRole,
-        },
-      });
+      const createData: any = {
+        firebaseUid,
+        phoneNumber,
+        role: newRole,
+      };
+      if (email) createData.email = email;
+
+      user = await prisma.user.create({ data: createData });
 
       // Create Passenger or Driver profile
       if (newRole === 'PASSENGER') {
@@ -88,12 +104,23 @@ router.post('/verify-token', async (req, res) => {
       user: {
         id: user.id,
         phoneNumber: user.phoneNumber,
+        email: user.email,
         role: user.role,
       },
     });
   } catch (err: any) {
     console.error('Auth error:', err);
     res.status(500).json({ error: 'Authentication failed', message: err.message });
+  }
+});
+
+// GET /api/v1/auth/owner-exists — check if owner account already exists
+router.get('/owner-exists', async (_req, res) => {
+  try {
+    const owner = await prisma.user.findFirst({ where: { role: 'OWNER' } });
+    res.json({ exists: !!owner, claimed: owner ? owner.firebaseUid !== 'OWNER_PENDING' : false });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to check owner status' });
   }
 });
 

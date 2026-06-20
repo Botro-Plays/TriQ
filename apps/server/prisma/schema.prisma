@@ -77,6 +77,7 @@ enum DocumentStatus {
 model User {
   id          String   @id @default(uuid())
   firebaseUid String   @unique
+  email       String?  @unique
   phoneNumber String   @unique
   role        UserRole @default(PASSENGER)
   createdAt   DateTime @default(now())

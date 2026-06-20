@@ -6,6 +6,7 @@ type UserRole = 'PASSENGER' | 'DRIVER' | 'OWNER' | 'STAFF' | null;
 interface User {
   id: string;
   phoneNumber: string;
+  email?: string;
   role: UserRole;
 }
 

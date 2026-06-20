@@ -48,6 +48,18 @@ async function main() {
     });
   }
 
+  // Seed Owner account (rightful owner — must login with phone +639564805224 to claim)
+  await prisma.user.upsert({
+    where: { phoneNumber: '+639564805224' },
+    update: {},
+    create: {
+      firebaseUid: 'OWNER_PENDING',
+      email: 'aquariusbotro@gmail.com',
+      phoneNumber: '+639564805224',
+      role: 'OWNER',
+    },
+  });
+
   console.log('✅ Seed complete');
 }
 
