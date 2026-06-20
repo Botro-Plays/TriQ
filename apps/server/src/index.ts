@@ -89,40 +89,23 @@ app.use(errorHandler);
 
 // Serve built web app (PWA) static files
 const webDistPath = path.resolve(__dirname, '../../web/dist');
-const fs = require('fs');
-if (process.env.NODE_ENV === 'production' && fs.existsSync(webDistPath)) {
-  // Simple file serving with minimal headers — avoid HTTP/2 proxy frame issues
-  const serveStatic = (relativePath: string, contentType?: string) => {
-    const filePath = path.join(webDistPath, relativePath);
-    return (_req: express.Request, res: express.Response) => {
-      if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
-      if (contentType) res.type(contentType);
-      res.sendFile(filePath);
-    };
-  };
-
-  // Hashed assets in /assets/*
-  app.get('/assets/*', (req, res) => {
-    const filePath = path.join(webDistPath, 'assets', (req.params as any)[0]);
-    if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
-    res.sendFile(filePath);
-  });
-
-  // Root-level static files
-  app.get('/favicon.svg', serveStatic('favicon.svg', 'image/svg+xml'));
-  app.get('/manifest.webmanifest', serveStatic('manifest.webmanifest', 'application/manifest+json'));
-  app.get('/registerSW.js', serveStatic('registerSW.js', 'application/javascript'));
-  app.get('/sw.js', serveStatic('sw.js', 'application/javascript'));
-  app.get('/workbox-:hash.js', (req, res) => {
-    const filePath = path.join(webDistPath, `workbox-${req.params.hash}.js`);
-    if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
-    res.type('application/javascript');
-    res.sendFile(filePath);
-  });
-  app.get('/logo-tricycle.png', serveStatic('logo-tricycle.png', 'image/png'));
+if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPath)) {
+  // Use express.static with HTTP/2-compatible options
+  app.use(express.static(webDistPath, {
+    etag: false, // Disable ETag to avoid HTTP/2 proxy issues
+    lastModified: false, // Disable Last-Modified to avoid HTTP/2 proxy issues
+    maxAge: '1y', // Long cache for hashed assets
+    setHeaders: (res) => {
+      res.removeHeader('X-Powered-By');
+    },
+  }));
 
   // React Router catch-all: serve index.html for non-API routes
-  app.get('*', (_req, res) => {
+  app.get('*', (req, res) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'Not Found', message: 'The requested resource does not exist' });
+    }
     res.sendFile(path.join(webDistPath, 'index.html'));
   });
 } else {
