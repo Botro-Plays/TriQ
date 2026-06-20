@@ -1,4 +1,4 @@
-name: Build + Migrate + Commit Dist
+name: CI Build Check
 
 on:
   push:
@@ -10,14 +10,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-commit:
+  build-check:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -39,11 +37,7 @@ jobs:
       - name: Build Server
         run: npm run build -w apps/server
 
-      - name: Commit built dist files
+      - name: Verify builds succeeded
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git add apps/web/dist apps/server/dist
-          git diff --cached --quiet || git commit -m "chore(build): production dist [skip ci]"
-          git push
+          test -f apps/web/dist/index.html && echo "Web build OK"
+          test -f apps/server/dist/index.js && echo "Server build OK"

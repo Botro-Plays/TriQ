@@ -6,11 +6,7 @@ node_modules/
 # Build outputs
 build/
 *.tsbuildinfo
-# dist/ is ignored by default, but we commit production builds for HidenCloud
-# Specific exceptions below (managed by CI workflow)
 dist/
-!apps/web/dist/
-!apps/server/dist/
 
 # Environment files
 .env
