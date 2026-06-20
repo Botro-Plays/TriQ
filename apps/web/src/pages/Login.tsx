@@ -14,36 +14,14 @@ const ROLES: { label: string; value: UserRole; description: string; icon: string
   { label: 'Owner', value: 'OWNER', description: 'Full admin control', icon: 'O' },
 ];
 
-/* BIMI-ready minimal tricycle icon — solid shapes only, works at 32px */
 function TriQLogo({ className = '' }: { className?: string }) {
   return (
-    <svg viewBox="0 0 120 120" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Badge */}
-      <circle cx="60" cy="60" r="54" fill="#0F172A" stroke="#06B6D4" strokeWidth="2" />
-      <circle cx="60" cy="60" r="56" stroke="#06B6D4" strokeWidth="1" opacity="0.25" />
-
-      {/* Motorcycle body (yellow) — low, long, facing right */}
-      <path d="M26 62h32c4 0 7 3 7 7v5H26v-12z" fill="#FACC15" />
-      <path d="M30 54c0-3 3-5 6-5h14c4 0 6 2 6 5v8H30v-8z" fill="#FACC15" />
-      {/* Handlebar */}
-      <path d="M58 48h12" stroke="#FACC15" strokeWidth="3" strokeLinecap="round" />
-
-      {/* Sidecar (yellow) — tall pedicab body extending right of motorcycle */}
-      <path d="M52 68c0-7 4-12 9-12h22c5 0 9 5 9 12v12H52v-12z" fill="#FACC15" />
-      {/* Sidecar roof dome */}
-      <path d="M54 56c0-8 5-14 12-14s12 6 12 14" stroke="#06B6D4" strokeWidth="2" fill="none" />
-
-      {/* Wheels — solid black with yellow rims, cyan hubs */}
-      {/* Rear (motorcycle) */}
-      <circle cx="32" cy="84" r="11" fill="#0F172A" stroke="#FACC15" strokeWidth="2" />
-      <circle cx="32" cy="84" r="4" fill="#06B6D4" />
-      {/* Front (motorcycle) */}
-      <circle cx="66" cy="84" r="9" fill="#0F172A" stroke="#FACC15" strokeWidth="2" />
-      <circle cx="66" cy="84" r="3" fill="#06B6D4" />
-      {/* Sidecar (right) */}
-      <circle cx="92" cy="84" r="7" fill="#0F172A" stroke="#FACC15" strokeWidth="2" />
-      <circle cx="92" cy="84" r="2.5" fill="#06B6D4" />
-    </svg>
+    <img
+      src="/logo-tricycle.png"
+      alt="TriQ Tricycle"
+      className={`object-contain ${className}`}
+      draggable={false}
+    />
   );
 }
 
