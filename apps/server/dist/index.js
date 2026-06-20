@@ -59,19 +59,7 @@ exports.prisma = new client_1.PrismaClient({
 app.set('trust proxy', 1);
 // Middleware
 app.use((0, helmet_1.default)({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://www.google.com", "https://www.gstatic.com", "https://*.firebaseio.com", "https://*.googleapis.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com"],
-            fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "https:", "https://*.google.com", "https://*.gstatic.com"],
-            connectSrc: ["'self'", "https://*.firebaseio.com", "https://*.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://www.google.com"],
-            frameSrc: ["'self'", "https://www.google.com", "https://*.firebaseapp.com"],
-            frameAncestors: ["'self'", "https://www.google.com"],
-            childSrc: ["'self'", "blob:"],
-        },
-    },
+    contentSecurityPolicy: false, // Disable CSP — may cause HTTP/2 proxy issues with HidenCloud
 }));
 app.use((0, cors_1.default)({
     origin: process.env.WEB_APP_URL || 'http://localhost:5173',
@@ -103,18 +91,15 @@ app.use(errorHandler_1.errorHandler);
 const webDistPath = path_1.default.resolve(__dirname, '../../web/dist');
 const fs = require('fs');
 if (process.env.NODE_ENV === 'production' && fs.existsSync(webDistPath)) {
-    // Explicit file serving — avoids HTTP/2 proxy issues with express.static etag/range handling
+    // Simple file serving with minimal headers — avoid HTTP/2 proxy frame issues
     const serveStatic = (relativePath, contentType) => {
         const filePath = path_1.default.join(webDistPath, relativePath);
         return (_req, res) => {
             if (!fs.existsSync(filePath))
                 return res.status(404).send('Not found');
             if (contentType)
-                res.setHeader('Content-Type', contentType);
-            // Read file and send with explicit Content-Length to avoid chunked encoding
-            const fileContent = fs.readFileSync(filePath);
-            res.setHeader('Content-Length', fileContent.length);
-            res.send(fileContent);
+                res.type(contentType);
+            res.sendFile(filePath);
         };
     };
     // Hashed assets in /assets/*
@@ -122,9 +107,7 @@ if (process.env.NODE_ENV === 'production' && fs.existsSync(webDistPath)) {
         const filePath = path_1.default.join(webDistPath, 'assets', req.params[0]);
         if (!fs.existsSync(filePath))
             return res.status(404).send('Not found');
-        const fileContent = fs.readFileSync(filePath);
-        res.setHeader('Content-Length', fileContent.length);
-        res.send(fileContent);
+        res.sendFile(filePath);
     });
     // Root-level static files
     app.get('/favicon.svg', serveStatic('favicon.svg', 'image/svg+xml'));
@@ -135,18 +118,13 @@ if (process.env.NODE_ENV === 'production' && fs.existsSync(webDistPath)) {
         const filePath = path_1.default.join(webDistPath, `workbox-${req.params.hash}.js`);
         if (!fs.existsSync(filePath))
             return res.status(404).send('Not found');
-        const fileContent = fs.readFileSync(filePath);
-        res.setHeader('Content-Type', 'application/javascript');
-        res.setHeader('Content-Length', fileContent.length);
-        res.send(fileContent);
+        res.type('application/javascript');
+        res.sendFile(filePath);
     });
     app.get('/logo-tricycle.png', serveStatic('logo-tricycle.png', 'image/png'));
     // React Router catch-all: serve index.html for non-API routes
     app.get('*', (_req, res) => {
-        const filePath = path_1.default.join(webDistPath, 'index.html');
-        const fileContent = fs.readFileSync(filePath);
-        res.setHeader('Content-Length', fileContent.length);
-        res.send(fileContent);
+        res.sendFile(path_1.default.join(webDistPath, 'index.html'));
     });
 }
 else {
