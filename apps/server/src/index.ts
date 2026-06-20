@@ -59,6 +59,10 @@ if (process.env.NODE_ENV === 'production' && require('fs').existsSync(webDistPat
     etag: false,
     lastModified: false,
     maxAge: '1y',
+    setHeaders: (res) => {
+      // Force connection close per response to avoid HTTP/2 keep-alive frame issues
+      res.setHeader('Connection', 'close');
+    },
   }));
 }
 
