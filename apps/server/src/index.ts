@@ -52,9 +52,6 @@ export const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
 
-// Trust proxy (HidenCloud reverse proxy)
-app.set('trust proxy', 1);
-
 // Middleware
 app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP — may cause HTTP/2 proxy issues with HidenCloud
