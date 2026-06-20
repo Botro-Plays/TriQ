@@ -21,7 +21,20 @@ async function start() {
   log('Node version:', process.version);
   log('Working directory:', REPO_ROOT);
 
-  // Pull latest — use fetch + reset to handle force-pushes cleanly
+  // Clone or pull latest — handle fresh container (no .git) and force-pushes
+  if (!fs.existsSync(path.join(REPO_ROOT, '.git'))) {
+    try {
+      log('No git repo found — cloning from GitHub...');
+      run('git clone https://github.com/Botro-Plays/TriQ.git /tmp/triq-clone', '/tmp');
+      // Copy cloned files into container root (preserve index.js and .env)
+      run('cp -r /tmp/triq-clone/.git /home/container/', REPO_ROOT);
+      run('cp -r /tmp/triq-clone/* /home/container/ 2>/dev/null || true', REPO_ROOT);
+      run('rm -rf /tmp/triq-clone', '/tmp');
+      log('Clone complete.');
+    } catch (err) {
+      log('Git clone failed:', err.message);
+    }
+  }
   if (fs.existsSync(path.join(REPO_ROOT, '.git'))) {
     try {
       log('Fetching latest code...');
