@@ -40,6 +40,19 @@ router.post('/verify-token', async (req, res) => {
     // Upsert user in our database
     let user = await prisma.user.findUnique({ where: { firebaseUid } });
 
+    // Account linking: if Google user provides phone already registered, link accounts
+    if (!user && phoneNumber) {
+      const existingByPhone = await prisma.user.findUnique({ where: { phoneNumber } });
+      if (existingByPhone) {
+        // Update firebaseUid to link this Google account to the existing user
+        user = await prisma.user.update({
+          where: { id: existingByPhone.id },
+          data: { firebaseUid },
+        });
+        console.log(`Linked Google account ${firebaseUid} to existing user ${user.id}`);
+      }
+    }
+
     if (!user) {
       const newRole = role === 'DRIVER' ? 'DRIVER' : role === 'OWNER' ? 'OWNER' : role === 'STAFF' ? 'STAFF' : 'PASSENGER';
       user = await prisma.user.create({
