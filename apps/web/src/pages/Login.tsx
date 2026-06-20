@@ -19,7 +19,7 @@ function TriQLogo({ className = '' }: { className?: string }) {
     <img
       src="/logo-tricycle.png"
       alt="TriQ Tricycle"
-      className={`object-contain ${className}`}
+      className={`object-contain rounded-full ${className}`}
       draggable={false}
     />
   );
