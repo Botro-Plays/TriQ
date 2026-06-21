@@ -17,7 +17,7 @@ interface RideHistoryItem {
   finalFare: number | null;
   createdAt: string;
   completedAt: string | null;
-  driver: { id: string; name: string; plateNumber: string; subscriptionStatus: string } | null;
+  driver: { id: string; name: string; plateNumber: string; subscriptionStatus: string; subscriptionTier: string } | null;
   review: { id: string; rating: number; thumbsUp: boolean | null; comment: string | null } | null;
 }
 
@@ -191,7 +191,7 @@ export default function PassengerHistory() {
                   >
                     <FlagTriangleRight size={12} /> Report
                   </button>
-                  {ride.driver.subscriptionStatus === 'ACTIVE' && (
+                  {ride.driver.subscriptionStatus === 'ACTIVE' && ride.driver.subscriptionTier === 'PRO' && (
                     <button
                       onClick={() => rebook(ride)}
                       className="flex-1 h-8 rounded-lg bg-triq-cyan/10 text-triq-cyan border border-triq-cyan/30 text-xs font-medium flex items-center justify-center gap-1"

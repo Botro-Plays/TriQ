@@ -75,7 +75,7 @@ router.get('/:id/rides', async (req, res) => {
         finalFare: true,
         createdAt: true,
         completedAt: true,
-        driver: { select: { id: true, name: true, plateNumber: true, subscriptionStatus: true } },
+        driver: { select: { id: true, name: true, plateNumber: true, subscriptionStatus: true, subscriptionTier: true } },
         review: { select: { id: true, rating: true, thumbsUp: true, comment: true } },
       },
     });

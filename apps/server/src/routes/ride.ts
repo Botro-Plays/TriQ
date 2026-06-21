@@ -97,18 +97,18 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    // If rebook with preferredDriverId, verify driver has active subscription
+    // If rebook with preferredDriverId, verify driver has active PRO subscription
     if (preferredDriverId) {
       const driver = await prisma.driver.findUnique({
         where: { id: preferredDriverId },
-        select: { id: true, subscriptionStatus: true, status: true },
+        select: { id: true, subscriptionStatus: true, subscriptionTier: true, status: true },
       });
       if (!driver) {
         res.status(404).json({ error: 'Preferred driver not found' });
         return;
       }
-      if (driver.subscriptionStatus !== 'ACTIVE') {
-        res.status(403).json({ error: 'Driver does not have an active subscription. Rebook is a Pro-only feature.' });
+      if (driver.subscriptionTier !== 'PRO' || driver.subscriptionStatus !== 'ACTIVE') {
+        res.status(403).json({ error: 'Driver does not have an active Pro subscription. Rebook is a Pro-only feature.' });
         return;
       }
     }
