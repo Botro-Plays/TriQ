@@ -3,7 +3,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
 import { getCurrentLocation, type GeoError } from '../../lib/geolocation';
-import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X, TrendingUp, Search, Plus } from 'lucide-react';
+import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X, TrendingUp, Search, Plus, Phone } from 'lucide-react';
 
 const DIGOS_CENTER: [number, number] = [6.7500, 125.3573];
 
@@ -28,7 +28,7 @@ interface ActiveRide {
   negotiatedFare: number | null;
   startedAt: string | null;
   passenger: { name: string };
-  driver?: { id: string; name: string; plateNumber: string; tricycleModel: string | null; rating: number; currentLat: number | null; currentLng: number | null };
+  driver?: { id: string; name: string; plateNumber: string; tricycleModel: string | null; rating: number; currentLat: number | null; currentLng: number | null; user?: { phoneNumber: string } };
 }
 
 export default function PassengerHome() {
@@ -52,6 +52,8 @@ export default function PassengerHome() {
   const [estimating, setEstimating] = useState(false);
   const [dropoffQuery, setDropoffQuery] = useState('');
   const [driverTip, setDriverTip] = useState(0);
+  const [customTip, setCustomTip] = useState('');
+  const [showCustomTip, setShowCustomTip] = useState(false);
   const [searchResults, setSearchResults] = useState<{ lat: number; lng: number; display_name: string }[]>([]);
   const [searching, setSearching] = useState(false);
 
@@ -88,19 +90,36 @@ export default function PassengerHome() {
     return () => clearInterval(interval);
   }, [passengerId]);
 
-  // Fetch nearby drivers when pickup is set
-  const fetchNearby = useCallback(async () => {
-    if (!pickup) return;
+  // Fetch nearby drivers when pickup is set or on mount using GPS
+  const fetchNearby = useCallback(async (lat?: number, lng?: number) => {
+    const queryLat = lat ?? pickup?.lat;
+    const queryLng = lng ?? pickup?.lng;
+    if (!queryLat || !queryLng) return;
     try {
-      const { data } = await api.get('/drivers/nearby', { params: { lat: pickup.lat, lng: pickup.lng, radius: 2.5 } });
+      const { data } = await api.get('/drivers/nearby', { params: { lat: queryLat, lng: queryLng, radius: 2.5 } });
       setNearbyDrivers(data.drivers);
-    } catch {}
+    } catch (err: any) {
+      console.error('Failed to fetch nearby drivers:', err?.response?.data || err?.message);
+    }
   }, [pickup]);
+
+  // On mount, try to get GPS location and fetch nearby drivers immediately
+  useEffect(() => {
+    if (step !== 'idle') return;
+    getCurrentLocation()
+      .then((pos) => {
+        if (!pickup) {
+          setPickup({ lat: pos.lat, lng: pos.lng, address: 'Current location' });
+        }
+        fetchNearby(pos.lat, pos.lng);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (pickup && step === 'idle') {
       fetchNearby();
-      const interval = setInterval(fetchNearby, 10000);
+      const interval = setInterval(() => fetchNearby(), 10000);
       return () => clearInterval(interval);
     }
   }, [pickup, step, fetchNearby]);
@@ -502,9 +521,9 @@ export default function PassengerHome() {
                       {[0, 100, 200, 500, 1000, 1500, 2000].map((amt) => (
                         <button
                           key={amt}
-                          onClick={() => setDriverTip(amt)}
+                          onClick={() => { setDriverTip(amt); setShowCustomTip(false); }}
                           className={`px-2.5 h-8 rounded-lg text-xs font-medium transition-all active:scale-90 ${
-                            driverTip === amt
+                            driverTip === amt && !showCustomTip
                               ? 'bg-triq-cyan text-triq-dark'
                               : 'bg-triq-light/10 text-gray-400 hover:bg-triq-light/20'
                           }`}
@@ -512,7 +531,36 @@ export default function PassengerHome() {
                           {amt === 0 ? 'None' : `+₱${(amt / 100).toFixed(0)}`}
                         </button>
                       ))}
+                      <button
+                        onClick={() => { setShowCustomTip(true); setDriverTip(0); }}
+                        className={`px-2.5 h-8 rounded-lg text-xs font-medium transition-all active:scale-90 ${
+                          showCustomTip
+                            ? 'bg-triq-cyan text-triq-dark'
+                            : 'bg-triq-light/10 text-gray-400 hover:bg-triq-light/20'
+                        }`}
+                      >
+                        Custom
+                      </button>
                     </div>
+                    {showCustomTip && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-xs text-gray-400">₱</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="500"
+                          value={customTip}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomTip(val);
+                            const parsed = parseInt(val) || 0;
+                            setDriverTip(parsed > 0 ? parsed * 100 : 0);
+                          }}
+                          placeholder="Enter amount"
+                          className="w-28 h-8 px-2 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+                        />
+                      </div>
+                    )}
                     {driverTip > 0 && (
                       <p className="text-[11px] text-gray-500 mt-1.5">Added to driver's fare</p>
                     )}
@@ -707,6 +755,15 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
             <p className="text-white font-semibold text-sm truncate">{ride.driver.name}</p>
             <p className="text-gray-400 text-xs">{ride.driver.plateNumber} · ⭐ {ride.driver.rating.toFixed(1)}</p>
           </div>
+          {ride.driver.user?.phoneNumber && (
+            <a
+              href={`tel:${ride.driver.user.phoneNumber}`}
+              className="shrink-0 w-9 h-9 rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 flex items-center justify-center active:scale-90"
+              title="Call driver"
+            >
+              <Phone size={16} />
+            </a>
+          )}
         </div>
       )}
 

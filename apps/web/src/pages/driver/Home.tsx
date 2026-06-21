@@ -3,6 +3,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
 import { getCurrentLocation, watchLocation, clearWatch, type GeoError } from '../../lib/geolocation';
+import { Phone } from 'lucide-react';
 import { Navigation, X } from 'lucide-react';
 
 const DIGOS_CENTER: [number, number] = [6.7500, 125.3573];
@@ -21,7 +22,7 @@ interface PendingRide {
   hasSeniorCitizen: boolean;
   hasStudent: boolean;
   hasExtraBaggage: boolean;
-  passenger: { name: string };
+  passenger: { name: string; user?: { phoneNumber: string } };
 }
 
 interface ActiveRide {
@@ -407,6 +408,13 @@ export default function DriverHome() {
               <p className="text-white font-semibold text-sm">{activeRide.passenger.name}</p>
               <p className="text-gray-400 text-xs">{activeRide.passenger.user.phoneNumber}</p>
             </div>
+            <a
+              href={`tel:${activeRide.passenger.user.phoneNumber}`}
+              className="shrink-0 w-9 h-9 rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 flex items-center justify-center active:scale-90"
+              title="Call passenger"
+            >
+              <Phone size={16} />
+            </a>
             {activeRide.negotiatedFare ? (
               <div className="text-right">
                 <span className="text-gray-500 line-through text-xs">₱{(activeRide.estimatedFare / 100).toFixed(0)}</span>
@@ -579,6 +587,15 @@ function RideRequestCard({
         >
           Counter
         </button>
+        {ride.passenger.user?.phoneNumber && (
+          <a
+            href={`tel:${ride.passenger.user.phoneNumber}`}
+            className="h-10 w-10 rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 flex items-center justify-center active:scale-90 shrink-0"
+            title="Call passenger"
+          >
+            <Phone size={16} />
+          </a>
+        )}
         <button
           onClick={onDecline}
           className="h-10 px-3 rounded-lg border border-triq-light/30 text-gray-400 text-sm font-medium"

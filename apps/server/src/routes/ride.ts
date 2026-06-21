@@ -165,7 +165,7 @@ router.get('/pending', async (req, res) => {
       orderBy: { createdAt: 'asc' },
       take: 20,
       include: {
-        passenger: { select: { name: true } },
+        passenger: { select: { name: true, user: { select: { phoneNumber: true } } } },
       },
     });
 
@@ -260,7 +260,7 @@ router.get('/active', async (req, res) => {
       orderBy: { createdAt: 'desc' },
       include: {
         passenger: { select: { id: true, name: true, photoUrl: true, user: { select: { phoneNumber: true } } } },
-        driver: { select: { id: true, name: true, plateNumber: true, tricycleModel: true, photoUrl: true, rating: true, currentLat: true, currentLng: true } },
+        driver: { select: { id: true, name: true, plateNumber: true, tricycleModel: true, photoUrl: true, rating: true, currentLat: true, currentLng: true, user: { select: { phoneNumber: true } } } },
       },
     });
 
@@ -277,7 +277,7 @@ router.get('/:id', async (req, res) => {
       where: { id: req.params.id },
       include: {
         passenger: { select: { id: true, name: true, photoUrl: true, user: { select: { phoneNumber: true } } } },
-        driver: { select: { id: true, name: true, plateNumber: true, tricycleModel: true, photoUrl: true, rating: true, currentLat: true, currentLng: true } },
+        driver: { select: { id: true, name: true, plateNumber: true, tricycleModel: true, photoUrl: true, rating: true, currentLat: true, currentLng: true, user: { select: { phoneNumber: true } } } },
         statusHistory: { orderBy: { createdAt: 'asc' } },
       },
     });
