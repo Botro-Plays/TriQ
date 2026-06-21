@@ -4,7 +4,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
 import { getCurrentLocation, type GeoError } from '../../lib/geolocation';
-import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X, TrendingUp, Search, Plus, Phone, AlertTriangle, Share2, Star, ThumbsUp, ThumbsDown, Clock } from 'lucide-react';
+import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X, TrendingUp, Search, Plus, Phone, AlertTriangle, Share2, Star, ThumbsUp, ThumbsDown, Clock, Heart } from 'lucide-react';
 
 const DIGOS_CENTER: [number, number] = [6.7500, 125.3573];
 
@@ -713,6 +713,12 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
   const [emergencyTriggered, setEmergencyTriggered] = useState(false);
   const [, setTick] = useState(0);
   const emergencyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Platform tip state
+  const [showTipModal, setShowTipModal] = useState(false);
+  const [tipAmount, setTipAmount] = useState(0);
+  const [tipCustom, setTipCustom] = useState('');
+  const [tipping, setTipping] = useState(false);
+  const [tipSuccess, setTipSuccess] = useState(false);
   const counterFare = ride.counterOfferedFare ? ride.counterOfferedFare / 100 : null;
   const isCounterOffered = ride.status === 'COUNTER_OFFERED' && counterFare !== null;
   const isCounterAccepted = ride.status === 'COUNTER_OFFER_ACCEPTED' && ride.negotiatedFare;
@@ -834,6 +840,24 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
     } catch {} finally {
       setCounterLoading(false);
     }
+  };
+
+  const submitPlatformTip = async () => {
+    if (tipAmount < 100) return;
+    setTipping(true);
+    try {
+      const res = await api.post('/tips', {
+        amount: tipAmount,
+        rideId: ride.id,
+      });
+      if (res.data.checkoutUrl) {
+        window.location.href = res.data.checkoutUrl;
+      } else {
+        setTipSuccess(true);
+        setShowTipModal(false);
+        setTimeout(() => setTipSuccess(false), 3000);
+      }
+    } catch {} finally { setTipping(false); }
   };
 
   return (
@@ -994,6 +1018,20 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
             <ThumbsUp size={14} /> Thanks for rating!
           </div>
         )}
+        {isCompleted && !tipSuccess && (
+          <button
+            onClick={() => setShowTipModal(true)}
+            className="h-10 px-3 rounded-lg bg-triq-cyan/10 text-triq-cyan border border-triq-cyan/30 text-xs font-medium flex items-center gap-1.5"
+          >
+            <Heart size={14} />
+            Tip
+          </button>
+        )}
+        {tipSuccess && (
+          <div className="h-10 px-3 rounded-lg bg-green-500/10 text-green-400 text-xs font-medium flex items-center gap-1.5">
+            <Heart size={14} /> Tipped!
+          </div>
+        )}
         {ride.driver && !['CANCELLED'].includes(ride.status) && (
           <button
             onClick={() => setShowReport(true)}
@@ -1121,6 +1159,58 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
                 Confirm Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Platform tip modal */}
+      {showTipModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowTipModal(false)}>
+          <div className="bg-triq-slate rounded-xl border border-triq-light/30 p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Heart size={18} className="text-triq-cyan" /> Tip TriQ
+              </h3>
+              <button onClick={() => setShowTipModal(false)} className="text-gray-400 hover:text-white"><X size={18} /></button>
+            </div>
+            <p className="text-sm text-gray-400">Support the platform with a small tip. Pay via GCash, Maya, or card.</p>
+            <div className="flex gap-2 flex-wrap">
+              {[1000, 2000, 5000, 10000].map((amt) => (
+                <button
+                  key={amt}
+                  onClick={() => { setTipAmount(amt); setTipCustom(''); }}
+                  className={`px-3 h-9 rounded-lg text-sm font-medium transition-all active:scale-90 ${
+                    tipAmount === amt && !tipCustom
+                      ? 'bg-triq-cyan text-triq-dark'
+                      : 'bg-triq-light/10 text-gray-400 hover:bg-triq-light/20'
+                  }`}
+                >
+                  ₱{(amt / 100).toFixed(0)}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">₱</span>
+              <input
+                type="number"
+                min="1"
+                value={tipCustom}
+                onChange={(e) => {
+                  setTipCustom(e.target.value);
+                  const parsed = parseInt(e.target.value) || 0;
+                  setTipAmount(parsed > 0 ? parsed * 100 : 0);
+                }}
+                placeholder="Custom amount"
+                className="flex-1 h-9 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+              />
+            </div>
+            <button
+              onClick={submitPlatformTip}
+              disabled={tipping || tipAmount < 100}
+              className="w-full h-10 rounded-lg bg-triq-cyan text-triq-dark font-bold text-sm disabled:opacity-40"
+            >
+              {tipping ? 'Processing...' : `Tip ₱${(tipAmount / 100).toFixed(0)}`}
+            </button>
           </div>
         </div>
       )}

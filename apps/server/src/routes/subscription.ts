@@ -93,7 +93,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
     const checkoutId = session.data.id;
     const checkoutUrl = session.data.attributes.checkout_url;
 
-    // Create pending subscription
+    // Create pending subscription — will be activated by webhook when payment is confirmed
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
@@ -101,7 +101,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       data: {
         driverId,
         tier: 'PRO',
-        status: 'ACTIVE',
+        status: 'PENDING',
         amount: PRO_PRICE_CENTAVOS,
         paymongoId: checkoutId,
         startedAt: new Date(),
@@ -109,14 +109,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       },
     });
 
-    await prisma.driver.update({
-      where: { id: driverId },
-      data: {
-        subscriptionTier: 'PRO',
-        subscriptionStatus: 'ACTIVE',
-        subscriptionExpiresAt: expiresAt,
-      },
-    });
+    // Don't update driver's subscription fields yet — wait for webhook confirmation
 
     res.status(201).json({ subscription: sub, checkoutUrl });
   } catch (err: any) {

@@ -34,6 +34,7 @@ enum SubscriptionTier {
 }
 
 enum SubscriptionStatus {
+  PENDING
   ACTIVE
   EXPIRED
   CANCELLED

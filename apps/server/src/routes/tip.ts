@@ -8,8 +8,19 @@ const router = Router();
 router.post('/', async (req: AuthRequest, res) => {
   try {
     const { passengerId, amount, rideId } = req.body;
-    if (!passengerId || typeof amount !== 'number' || amount < 100) {
-      res.status(400).json({ error: 'passengerId and amount (min 100 centavos = ₱1) are required' });
+    if (typeof amount !== 'number' || amount < 100) {
+      res.status(400).json({ error: 'amount (min 100 centavos = ₱1) is required' });
+      return;
+    }
+
+    // Resolve passengerId — from body or from auth user
+    let resolvedPassengerId = passengerId;
+    if (!resolvedPassengerId && req.user?.userId) {
+      const passenger = await prisma.passenger.findUnique({ where: { userId: req.user.userId } });
+      resolvedPassengerId = passenger?.id;
+    }
+    if (!resolvedPassengerId) {
+      res.status(400).json({ error: 'Could not determine passenger — provide passengerId' });
       return;
     }
 
@@ -20,7 +31,7 @@ router.post('/', async (req: AuthRequest, res) => {
       // Dev mode — create tip as PENDING without PayMongo
       const tip = await prisma.tip.create({
         data: {
-          passengerId,
+          passengerId: resolvedPassengerId,
           rideId: rideId || null,
           amount,
           status: 'PENDING',
@@ -73,7 +84,7 @@ router.post('/', async (req: AuthRequest, res) => {
 
     const tip = await prisma.tip.create({
       data: {
-        passengerId,
+        passengerId: resolvedPassengerId,
         rideId: rideId || null,
         amount,
         status: 'PENDING',
