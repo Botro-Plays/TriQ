@@ -14,17 +14,54 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Calculate fare based on distance and city fare rate
-async function calculateFare(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number): Promise<number> {
-  const distance = haversine(pickupLat, pickupLng, dropoffLat, dropoffLng);
+// Fallback fare estimation using Haversine (when OSRM unavailable)
+function estimateFareFallback(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number, baseFare: number, perKmRate: number): number {
+  const straightLineKm = haversine(pickupLat, pickupLng, dropoffLat, dropoffLng);
+  if (straightLineKm <= 2.5) {
+    return baseFare; // ₱16 per person — most Digos rides are short
+  }
+  const estimatedRoadKm = straightLineKm * 1.3; // roads ~30% longer than straight-line
+  return Math.max(baseFare, Math.round(baseFare + (Math.max(0, estimatedRoadKm - 1) * perKmRate)));
+}
+
+// Calculate per-person fare based on distance and city fare rate
+async function calculatePerPersonFare(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number): Promise<{ perPersonFare: number; distanceKm: number; baseFare: number; perKmRate: number }> {
+  const straightLineKm = haversine(pickupLat, pickupLng, dropoffLat, dropoffLng);
   const city = await prisma.city.findFirst({
     where: { isActive: true },
     include: { fareRates: { where: { effectiveUntil: null }, orderBy: { effectiveFrom: 'desc' }, take: 1 } },
   });
   const fareRate = city?.fareRates[0];
-  if (!fareRate) return Math.round(distance * 1000 + 1600); // fallback: ₱10/km + ₱16 base
-  const distClamped = Math.max(distance, fareRate.minDistance);
-  return Math.round(fareRate.baseFare + distClamped * fareRate.perKmRate);
+
+  // Default Digos City rates
+  const baseFare = fareRate?.baseFare ?? 1600; // ₱16
+  const perKmRate = fareRate?.perKmRate ?? 1000; // ₱10/km
+
+  // TODO: Use OSRM for road distance when available
+  // Fallback: Haversine-based estimation
+  const perPersonFare = estimateFareFallback(pickupLat, pickupLng, dropoffLat, dropoffLng, baseFare, perKmRate);
+
+  return { perPersonFare, distanceKm: straightLineKm, baseFare, perKmRate };
+}
+
+// Calculate total fare with per-pax pricing and LGU discount
+async function calculateFare(
+  pickupLat: number, pickupLng: number,
+  dropoffLat: number, dropoffLng: number,
+  passengerCount: number = 1,
+  hasSeniorCitizen: boolean = false,
+  hasStudent: boolean = false
+): Promise<number> {
+  const { perPersonFare } = await calculatePerPersonFare(pickupLat, pickupLng, dropoffLat, dropoffLng);
+
+  // Advanced per-pax discount: senior/student passengers get 20% off their portion
+  if (hasSeniorCitizen || hasStudent) {
+    // Simplified: at least one qualifying passenger — 20% off entire fare
+    // (Advanced per-pax counting requires schema migration to store counts)
+    return Math.round(perPersonFare * passengerCount * 0.8);
+  }
+
+  return perPersonFare * passengerCount;
 }
 
 // POST /api/v1/rides — create ride request
@@ -58,7 +95,7 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    const estimatedFare = await calculateFare(pickupLat, pickupLng, dropoffLat, dropoffLng);
+    const estimatedFare = await calculateFare(pickupLat, pickupLng, dropoffLat, dropoffLng, passengerCount, hasSeniorCitizen, hasStudent);
 
     const ride = await prisma.ride.create({
       data: {
@@ -120,6 +157,48 @@ router.get('/pending', async (req, res) => {
     res.json({ rides: nearby });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get pending rides', message: err.message });
+  }
+});
+
+// GET /api/v1/rides/estimate — fare estimate before booking
+router.get('/estimate', async (req, res) => {
+  try {
+    const pickupLat = parseFloat(req.query.pickupLat as string);
+    const pickupLng = parseFloat(req.query.pickupLng as string);
+    const dropoffLat = parseFloat(req.query.dropoffLat as string);
+    const dropoffLng = parseFloat(req.query.dropoffLng as string);
+    const passengerCount = parseInt(req.query.passengerCount as string) || 1;
+    const seniorCount = parseInt(req.query.seniorCount as string) || 0;
+    const studentCount = parseInt(req.query.studentCount as string) || 0;
+
+    if (isNaN(pickupLat) || isNaN(dropoffLat)) {
+      res.status(400).json({ error: 'pickupLat, pickupLng, dropoffLat, dropoffLng are required' });
+      return;
+    }
+
+    const { perPersonFare, distanceKm, baseFare, perKmRate } = await calculatePerPersonFare(pickupLat, pickupLng, dropoffLat, dropoffLng);
+
+    // Advanced per-pax discount: regular passengers pay full, senior/student pay 80%
+    const discountCount = Math.min(seniorCount + studentCount, passengerCount);
+    const regularCount = passengerCount - discountCount;
+    const estimatedFare = Math.round(
+      (regularCount * perPersonFare) + (discountCount * perPersonFare * 0.8)
+    );
+
+    res.json({
+      estimatedFare,
+      perPersonFare,
+      discountedPerPersonFare: Math.round(perPersonFare * 0.8),
+      distanceKm: Math.round(distanceKm * 100) / 100,
+      baseFare,
+      perKmRate,
+      passengerCount,
+      seniorCount,
+      studentCount,
+      discountApplied: discountCount > 0,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to estimate fare', message: err.message });
   }
 });
 
@@ -378,7 +457,7 @@ router.post('/:id/counter-offer', async (req, res) => {
       return;
     }
 
-    const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 min expiry
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min expiry per docs
 
     const updated = await prisma.ride.update({
       where: { id: ride.id },

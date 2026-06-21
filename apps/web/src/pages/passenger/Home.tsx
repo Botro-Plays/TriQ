@@ -3,7 +3,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
 import { getCurrentLocation, type GeoError } from '../../lib/geolocation';
-import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X } from 'lucide-react';
+import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X, TrendingUp } from 'lucide-react';
 
 const DIGOS_CENTER: [number, number] = [6.7500, 125.3573];
 
@@ -39,11 +39,13 @@ export default function PassengerHome() {
   const [error, setError] = useState('');
   const [passengerId, setPassengerId] = useState<string | null>(null);
   const [passengerCount, setPassengerCount] = useState(1);
-  const [hasSeniorCitizen, setHasSeniorCitizen] = useState(false);
-  const [hasStudent, setHasStudent] = useState(false);
+  const [seniorCount, setSeniorCount] = useState(0);
+  const [studentCount, setStudentCount] = useState(0);
   const [hasExtraBaggage, setHasExtraBaggage] = useState(false);
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState('');
+  const [fareEstimate, setFareEstimate] = useState<{ estimatedFare: number; perPersonFare: number; discountedPerPersonFare: number; distanceKm: number; discountApplied: boolean } | null>(null);
+  const [estimating, setEstimating] = useState(false);
 
   // Get passenger profile
   useEffect(() => {
@@ -117,6 +119,32 @@ export default function PassengerHome() {
     }
   };
 
+  // Fetch fare estimate when pickup, dropoff, passenger count, or discount counts change
+  useEffect(() => {
+    if (!pickup || !dropoff) {
+      setFareEstimate(null);
+      return;
+    }
+    setEstimating(true);
+    const timer = setTimeout(() => {
+      api.get('/rides/estimate', {
+        params: {
+          pickupLat: pickup.lat,
+          pickupLng: pickup.lng,
+          dropoffLat: dropoff.lat,
+          dropoffLng: dropoff.lng,
+          passengerCount,
+          seniorCount,
+          studentCount,
+        },
+      })
+        .then((res) => setFareEstimate(res.data))
+        .catch(() => setFareEstimate(null))
+        .finally(() => setEstimating(false));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [pickup, dropoff, passengerCount, seniorCount, studentCount]);
+
   const requestRide = async () => {
     if (!passengerId || !pickup || !dropoff) return;
     setLoading(true);
@@ -131,8 +159,8 @@ export default function PassengerHome() {
         dropoffLng: dropoff.lng,
         dropoffAddress: dropoff.address,
         passengerCount,
-        hasSeniorCitizen,
-        hasStudent,
+        hasSeniorCitizen: seniorCount > 0,
+        hasStudent: studentCount > 0,
         hasExtraBaggage,
       });
       setStep('searching');
@@ -161,18 +189,26 @@ export default function PassengerHome() {
 
   const mapCenter: [number, number] = pickup ? [pickup.lat, pickup.lng] : DIGOS_CENTER;
 
-  const toggleChip = (active: boolean, setter: (v: boolean) => void, icon: React.ReactNode, label: string) => (
-    <button
-      onClick={() => setter(!active)}
-      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-95 ${
-        active
-          ? 'bg-triq-cyan/20 text-triq-cyan border border-triq-cyan/40'
-          : 'bg-triq-light/10 text-gray-400 border border-triq-light/20'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
+  const countChip = (icon: React.ReactNode, label: string, count: number, setCount: (n: number) => void, max: number) => (
+    <div className={`flex items-center gap-1 rounded-lg border ${
+      count > 0 ? 'bg-triq-cyan/10 border-triq-cyan/30' : 'bg-triq-light/10 border-triq-light/20'
+    }`}>
+      <div className={`flex items-center gap-1 px-2.5 py-2 text-xs font-medium ${count > 0 ? 'text-triq-cyan' : 'text-gray-400'}`}>
+        {icon}
+        {label}
+      </div>
+      <div className="flex items-center gap-0.5">
+        <button
+          onClick={() => setCount(Math.max(0, count - 1))}
+          className="w-6 h-6 rounded text-sm font-bold text-gray-400 hover:text-white"
+        >−</button>
+        <span className={`w-4 text-center text-xs font-bold ${count > 0 ? 'text-triq-cyan' : 'text-gray-500'}`}>{count}</span>
+        <button
+          onClick={() => setCount(Math.min(max, count + 1))}
+          className="w-6 h-6 rounded text-sm font-bold text-gray-400 hover:text-white"
+        >+</button>
+      </div>
+    </div>
   );
 
   return (
@@ -303,7 +339,7 @@ export default function PassengerHome() {
             )}
           </div>
 
-          {/* Ride details — passenger count + toggles */}
+          {/* Ride details — passenger count + counts */}
           <div className="card p-3 sm:p-4 space-y-3">
             <div>
               <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
@@ -313,7 +349,13 @@ export default function PassengerHome() {
                 {[1, 2, 3, 4, 5, 6].map((n) => (
                   <button
                     key={n}
-                    onClick={() => setPassengerCount(n)}
+                    onClick={() => {
+                      setPassengerCount(n);
+                      if (seniorCount + studentCount > n) {
+                        setSeniorCount(Math.min(seniorCount, n));
+                        setStudentCount(Math.min(studentCount, n - seniorCount));
+                      }
+                    }}
                     className={`w-9 h-9 rounded-lg text-sm font-bold transition-all active:scale-90 ${
                       passengerCount === n
                         ? 'bg-triq-yellow text-triq-dark'
@@ -331,15 +373,59 @@ export default function PassengerHome() {
                 Additional Info
               </label>
               <div className="flex gap-1.5 flex-wrap">
-                {toggleChip(hasSeniorCitizen, setHasSeniorCitizen, <Accessibility size={14} />, 'Senior')}
-                {toggleChip(hasStudent, setHasStudent, <GraduationCap size={14} />, 'Student')}
-                {toggleChip(hasExtraBaggage, setHasExtraBaggage, <Backpack size={14} />, 'Baggage')}
+                {countChip(<Accessibility size={14} />, 'Senior', seniorCount, setSeniorCount, passengerCount)}
+                {countChip(<GraduationCap size={14} />, 'Student', studentCount, setStudentCount, passengerCount - seniorCount)}
               </div>
-              {(hasSeniorCitizen || hasStudent) && (
-                <p className="text-[11px] text-gray-500 mt-1.5">20% LGU discount may apply</p>
+              <button
+                onClick={() => setHasExtraBaggage(!hasExtraBaggage)}
+                className={`mt-1.5 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-95 ${
+                  hasExtraBaggage
+                    ? 'bg-triq-cyan/20 text-triq-cyan border border-triq-cyan/40'
+                    : 'bg-triq-light/10 text-gray-400 border border-triq-light/20'
+                }`}
+              >
+                <Backpack size={14} />
+                Extra Baggage
+              </button>
+              {(seniorCount > 0 || studentCount > 0) && (
+                <p className="text-[11px] text-gray-500 mt-1.5">20% LGU discount per qualifying passenger</p>
               )}
             </div>
           </div>
+
+          {/* Fare estimate */}
+          {pickup && dropoff && (
+            <div className="card p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp size={16} className="text-triq-cyan" />
+                  <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Fare Estimate</span>
+                </div>
+                {estimating ? (
+                  <span className="inline-block w-4 h-4 border-2 border-triq-cyan/30 border-t-triq-cyan rounded-full animate-spin" />
+                ) : fareEstimate ? (
+                  <span className="text-triq-yellow font-bold text-xl">₱{(fareEstimate.estimatedFare / 100).toFixed(0)}</span>
+                ) : (
+                  <span className="text-gray-500 text-sm">—</span>
+                )}
+              </div>
+              {fareEstimate && !estimating && (
+                <div className="mt-2 space-y-1 text-xs text-gray-400">
+                  <div className="flex justify-between">
+                    <span>Distance</span>
+                    <span>{fareEstimate.distanceKm.toFixed(2)} km</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Per person</span>
+                    <span>₱{(fareEstimate.perPersonFare / 100).toFixed(0)}{fareEstimate.discountApplied && ` (₱${(fareEstimate.discountedPerPersonFare / 100).toFixed(0)} w/ discount)`}</span>
+                  </div>
+                  {fareEstimate.discountApplied && (
+                    <p className="text-green-400 text-[11px] mt-1">20% LGU discount applied to qualifying passengers</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Nearby drivers — compact */}
           {pickup && nearbyDrivers.length > 0 && (
@@ -356,15 +442,22 @@ export default function PassengerHome() {
             </div>
           )}
 
-          {/* Request button — sticky at bottom */}
+          {/* Request button — shows fare estimate */}
           <button
             onClick={requestRide}
             disabled={loading || !pickup || !dropoff}
             className="w-full h-12 rounded-xl bg-triq-yellow text-triq-dark font-bold text-base
               active:scale-[0.97] transition-transform
-              hover:shadow-neon-yellow disabled:opacity-40 disabled:cursor-not-allowed"
+              hover:shadow-neon-yellow disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {loading ? 'Requesting...' : 'Request Ride'}
+            {loading ? 'Requesting...' : (
+              <>
+                Request Ride
+                {fareEstimate && !loading && (
+                  <span className="text-sm opacity-80">· ₱{(fareEstimate.estimatedFare / 100).toFixed(0)}</span>
+                )}
+              </>
+            )}
           </button>
         </div>
       )}

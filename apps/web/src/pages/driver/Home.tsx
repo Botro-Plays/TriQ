@@ -206,7 +206,7 @@ export default function DriverHome() {
         <button
           onClick={isOnline ? goOffline : goOnline}
           className={`px-4 h-9 rounded-lg text-sm font-bold ${
-            isOnline ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-green-500/20 text-green-400 border border-green-500/30'
+            isOnline ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
           }`}
         >
           {isOnline ? '● Online' : '○ Offline'}
