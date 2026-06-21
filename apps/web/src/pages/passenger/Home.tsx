@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
@@ -25,6 +25,7 @@ interface ActiveRide {
   estimatedFare: number;
   counterOfferedFare: number | null;
   counterOfferExpiresAt: string | null;
+  negotiatedFare: number | null;
   passenger: { name: string };
   driver?: { id: string; name: string; plateNumber: string; tricycleModel: string | null; rating: number; currentLat: number | null; currentLng: number | null };
 }
@@ -61,6 +62,10 @@ export default function PassengerHome() {
       .catch(() => {});
   }, [user]);
 
+  // Track step in ref so polling interval doesn't get cleared on step changes
+  const stepRef = useRef(step);
+  stepRef.current = step;
+
   // Poll for active ride
   useEffect(() => {
     if (!passengerId) return;
@@ -70,7 +75,7 @@ export default function PassengerHome() {
           if (res.data.ride) {
             setActiveRide(res.data.ride);
             setStep('active');
-          } else if (step === 'active') {
+          } else if (stepRef.current === 'active') {
             setActiveRide(null);
             setStep('idle');
           }
@@ -80,7 +85,7 @@ export default function PassengerHome() {
     poll();
     const interval = setInterval(poll, 5000);
     return () => clearInterval(interval);
-  }, [passengerId, step]);
+  }, [passengerId]);
 
   // Fetch nearby drivers when pickup is set
   const fetchNearby = useCallback(async () => {
@@ -185,6 +190,8 @@ export default function PassengerHome() {
         passengerCount,
         hasSeniorCitizen: seniorCount > 0,
         hasStudent: studentCount > 0,
+        seniorCount,
+        studentCount,
         hasExtraBaggage,
         driverTip,
       });
@@ -554,9 +561,10 @@ export default function PassengerHome() {
 
 function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: () => void }) {
   const [counterLoading, setCounterLoading] = useState(false);
-  const fare = ride.estimatedFare / 100;
   const counterFare = ride.counterOfferedFare ? ride.counterOfferedFare / 100 : null;
   const isCounterOffered = ride.status === 'COUNTER_OFFERED' && counterFare !== null;
+  const isCounterAccepted = ride.status === 'COUNTER_OFFER_ACCEPTED' && ride.negotiatedFare;
+  const fare = (isCounterAccepted ? ride.negotiatedFare! : ride.estimatedFare) / 100;
   const statusLabels: Record<string, string> = {
     REQUESTED: 'Waiting for driver...',
     ACCEPTED: 'Driver assigned — heading to pickup',

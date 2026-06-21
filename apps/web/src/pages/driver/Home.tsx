@@ -29,7 +29,13 @@ interface ActiveRide {
   status: string;
   pickupAddress: string;
   dropoffAddress: string;
+  pickupLat: number;
+  pickupLng: number;
+  dropoffLat: number;
+  dropoffLng: number;
   estimatedFare: number;
+  counterOfferedFare: number | null;
+  counterOfferExpiresAt: string | null;
   passenger: { id: string; name: string; user: { phoneNumber: string } };
 }
 
@@ -131,14 +137,19 @@ export default function DriverHome() {
     }
   };
 
+  // Track location in ref so pending rides interval doesn't reset on every GPS update
+  const locationRef = useRef(location);
+  locationRef.current = location;
+
   // Fetch pending rides when online and no active ride
   useEffect(() => {
     if (!isOnline || !location || activeRide) return;
     const fetchPending = async () => {
       try {
-        // For now, fetch all requested rides — in production this would be via Socket.io
+        const loc = locationRef.current;
+        if (!loc) return;
         const { data } = await api.get('/rides/pending', {
-          params: { lat: location.lat, lng: location.lng, radius: 5 },
+          params: { lat: loc.lat, lng: loc.lng, radius: 5 },
         });
         setPendingRides(data.rides || []);
       } catch {
@@ -148,7 +159,7 @@ export default function DriverHome() {
     fetchPending();
     const interval = setInterval(fetchPending, 8000);
     return () => clearInterval(interval);
-  }, [isOnline, location, activeRide]);
+  }, [isOnline, location != null, activeRide]);
 
   const acceptRide = async (rideId: string) => {
     if (!driverId) return;
@@ -276,11 +287,22 @@ export default function DriverHome() {
       {activeRide ? (
         <div className="bg-triq-slate rounded-xl border border-triq-light/20 p-4 space-y-4">
           <h3 className="text-lg font-bold text-white">
+            {activeRide.status === 'COUNTER_OFFERED' && 'Waiting for passenger response...'}
+            {activeRide.status === 'COUNTER_OFFER_ACCEPTED' && 'Counter-offer accepted! Head to pickup'}
             {activeRide.status === 'ACCEPTED' && 'Heading to pickup'}
             {activeRide.status === 'ARRIVING' && 'Arriving at pickup'}
             {activeRide.status === 'IN_PROGRESS' && 'Ride in progress'}
           </h3>
 
+          {activeRide.status === 'COUNTER_OFFERED' && activeRide.counterOfferedFare && (
+            <div className="bg-triq-yellow/10 border border-triq-yellow/30 rounded-lg p-3 flex items-center justify-between">
+              <span className="text-xs text-gray-300">Your offer:</span>
+              <span className="text-triq-yellow font-bold text-lg">₱{(activeRide.counterOfferedFare / 100).toFixed(0)}</span>
+            </div>
+          )}
+
+          {activeRide.status !== 'COUNTER_OFFERED' && (
+            <>
           <div className="space-y-2 text-sm">
             <div className="flex items-start gap-2">
               <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5" />
@@ -310,7 +332,7 @@ export default function DriverHome() {
           </div>
 
           <div className="flex gap-2">
-            {activeRide.status === 'ACCEPTED' && (
+            {(activeRide.status === 'ACCEPTED' || activeRide.status === 'COUNTER_OFFER_ACCEPTED') && (
               <button
                 onClick={() => updateRideStatus('arriving')}
                 disabled={loading}
@@ -319,7 +341,7 @@ export default function DriverHome() {
                 I'm Arriving
               </button>
             )}
-            {(activeRide.status === 'ACCEPTED' || activeRide.status === 'ARRIVING') && (
+            {(activeRide.status === 'ACCEPTED' || activeRide.status === 'COUNTER_OFFER_ACCEPTED' || activeRide.status === 'ARRIVING') && (
               <button
                 onClick={() => updateRideStatus('start')}
                 disabled={loading}
@@ -344,6 +366,8 @@ export default function DriverHome() {
               Cancel
             </button>
           </div>
+            </>
+          )}
         </div>
       ) : isOnline ? (
         /* Pending ride requests */

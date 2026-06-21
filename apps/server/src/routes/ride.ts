@@ -58,14 +58,13 @@ async function calculateFare(
 ): Promise<number> {
   const { perPersonFare } = await calculatePerPersonFare(pickupLat, pickupLng, dropoffLat, dropoffLng);
 
-  // Advanced per-pax discount: senior/student passengers get 20% off their portion
-  let totalFare: number;
-  if (hasSeniorCitizen || hasStudent) {
-    // Simplified: at least one qualifying passenger — 20% off entire fare
-    totalFare = Math.round(perPersonFare * passengerCount * 0.8);
-  } else {
-    totalFare = perPersonFare * passengerCount;
-  }
+  // Per-pax discount: senior/student passengers get 20% off their portion
+  const discountCount = (hasSeniorCitizen ? 1 : 0) + (hasStudent ? 1 : 0);
+  const effectiveDiscountCount = Math.min(discountCount, passengerCount);
+  const regularCount = passengerCount - effectiveDiscountCount;
+  let totalFare = Math.round(
+    (regularCount * perPersonFare) + (effectiveDiscountCount * perPersonFare * 0.8)
+  );
 
   // Extra baggage surcharge (flat, once per ride)
   if (hasExtraBaggage) {
@@ -86,6 +85,8 @@ router.post('/', async (req, res) => {
       hasSeniorCitizen = false,
       hasStudent = false,
       hasExtraBaggage = false,
+      seniorCount = hasSeniorCitizen ? 1 : 0,
+      studentCount = hasStudent ? 1 : 0,
       driverTip = 0,
       paymentMethod = 'CASH',
     } = req.body;
@@ -107,7 +108,17 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    const estimatedFare = await calculateFare(pickupLat, pickupLng, dropoffLat, dropoffLng, passengerCount, hasSeniorCitizen, hasStudent, hasExtraBaggage) + driverTip;
+    // Calculate fare using same per-pax logic as estimate endpoint
+    const { perPersonFare } = await calculatePerPersonFare(pickupLat, pickupLng, dropoffLat, dropoffLng);
+    const discountCount = Math.min(seniorCount + studentCount, passengerCount);
+    const regularCount = passengerCount - discountCount;
+    let calculatedFare = Math.round(
+      (regularCount * perPersonFare) + (discountCount * perPersonFare * 0.8)
+    );
+    if (hasExtraBaggage) {
+      calculatedFare += EXTRA_BAGGAGE_FEE;
+    }
+    const estimatedFare = calculatedFare + driverTip;
 
     const ride = await prisma.ride.create({
       data: {
@@ -231,9 +242,14 @@ router.get('/active', async (req, res) => {
 
     let where: any = {};
     if (passengerId) {
-      where = { passengerId: passengerId as string, status: { in: ['REQUESTED', 'ACCEPTED', 'COUNTER_OFFERED', 'ARRIVING', 'IN_PROGRESS'] } };
+      where = { passengerId: passengerId as string, status: { in: ['REQUESTED', 'ACCEPTED', 'COUNTER_OFFERED', 'COUNTER_OFFER_ACCEPTED', 'ARRIVING', 'IN_PROGRESS'] } };
     } else if (driverId) {
-      where = { driverId: driverId as string, status: { in: ['ACCEPTED', 'COUNTER_OFFERED', 'ARRIVING', 'IN_PROGRESS'] } };
+      where = {
+        OR: [
+          { driverId: driverId as string, status: { in: ['ACCEPTED', 'COUNTER_OFFER_ACCEPTED', 'ARRIVING', 'IN_PROGRESS'] } },
+          { counterOfferDriverId: driverId as string, status: 'COUNTER_OFFERED' },
+        ],
+      };
     } else {
       res.status(400).json({ error: 'passengerId or driverId query param required' });
       return;
@@ -368,8 +384,8 @@ router.post('/:id/arriving', async (req, res) => {
       res.status(404).json({ error: 'Ride not found' });
       return;
     }
-    if (ride.status !== 'ACCEPTED') {
-      res.status(409).json({ error: 'Ride is not in ACCEPTED state' });
+    if (!['ACCEPTED', 'COUNTER_OFFER_ACCEPTED'].includes(ride.status)) {
+      res.status(409).json({ error: 'Ride is not in an accepted state' });
       return;
     }
 
@@ -396,7 +412,7 @@ router.post('/:id/start', async (req, res) => {
       res.status(404).json({ error: 'Ride not found' });
       return;
     }
-    if (!['ACCEPTED', 'ARRIVING'].includes(ride.status)) {
+    if (!['ACCEPTED', 'COUNTER_OFFER_ACCEPTED', 'ARRIVING'].includes(ride.status)) {
       res.status(409).json({ error: 'Ride cannot be started' });
       return;
     }
