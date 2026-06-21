@@ -107,8 +107,8 @@ router.post('/', async (req, res) => {
         res.status(404).json({ error: 'Preferred driver not found' });
         return;
       }
-      if (driver.subscriptionTier !== 'PRO' || driver.subscriptionStatus !== 'ACTIVE') {
-        res.status(403).json({ error: 'Driver does not have an active Pro subscription. Rebook is a Pro-only feature.' });
+      if (((driver.subscriptionTier as string) !== 'PRO' && (driver.subscriptionTier as string) !== 'ELITE') || driver.subscriptionStatus !== 'ACTIVE') {
+        res.status(403).json({ error: 'Driver does not have an active Pro or Elite subscription. Rebook is a paid subscription feature.' });
         return;
       }
     }

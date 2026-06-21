@@ -60,10 +60,14 @@ export default function DriverProfile() {
   // Subscription state
   const [subscribing, setSubscribing] = useState(false);
   const [proPrice, setProPrice] = useState<number>(50); // PHP, fetched from server
+  const [elitePrice, setElitePrice] = useState<number>(99); // PHP, fetched from server
 
   useEffect(() => {
     api.get('/subscriptions/price')
-      .then((res) => setProPrice(res.data.php))
+      .then((res) => {
+        setProPrice(res.data.pro.php);
+        setElitePrice(res.data.elite.php);
+      })
       .catch(() => {});
   }, []);
 
@@ -111,11 +115,11 @@ export default function DriverProfile() {
     } catch {} finally { setSubmittingKyc(false); }
   };
 
-  const upgradeToPro = async () => {
+  const upgradeToPro = async (tier: 'PRO' | 'ELITE' = 'PRO') => {
     if (!driver) return;
     setSubscribing(true);
     try {
-      const res = await api.post('/subscriptions/checkout', { driverId: driver.id });
+      const res = await api.post('/subscriptions/checkout', { driverId: driver.id, tier });
       if (res.data.checkoutUrl) {
         window.location.href = res.data.checkoutUrl;
       } else {
@@ -155,25 +159,56 @@ export default function DriverProfile() {
           <Crown size={18} className="text-triq-yellow" />
           <h3 className="text-sm font-semibold text-white">Subscription</h3>
         </div>
-        {driver?.subscriptionTier === 'PRO' ? (
+        {driver?.subscriptionTier === 'ELITE' ? (
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-triq-yellow font-bold text-sm">PRO Active</p>
-              <p className="text-xs text-gray-400">Rebook perk enabled · ₱{proPrice}/month</p>
+              <p className="text-triq-yellow font-bold text-sm">ELITE Active</p>
+              <p className="text-xs text-gray-400">All Pro perks + guaranteed top-3 placement · ₱{elitePrice}/month</p>
             </div>
-            <span className="px-2 py-1 rounded-lg bg-triq-yellow/20 text-triq-yellow text-xs font-bold">PRO</span>
+            <span className="px-2 py-1 rounded-lg bg-triq-yellow/20 text-triq-yellow text-xs font-bold">ELITE</span>
+          </div>
+        ) : driver?.subscriptionTier === 'PRO' ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-triq-yellow font-bold text-sm">PRO Active</p>
+                <p className="text-xs text-gray-400">Rebook perk enabled · ₱{proPrice}/month</p>
+              </div>
+              <span className="px-2 py-1 rounded-lg bg-triq-yellow/20 text-triq-yellow text-xs font-bold">PRO</span>
+            </div>
+            <button
+              onClick={() => upgradeToPro('ELITE')}
+              disabled={subscribing}
+              className="w-full h-9 rounded-lg bg-triq-yellow/20 border border-triq-yellow/40 text-triq-yellow font-bold text-sm disabled:opacity-40"
+            >
+              {subscribing ? 'Processing...' : `Upgrade to ELITE — ₱${elitePrice}/month`}
+            </button>
           </div>
         ) : (
-          <>
-            <p className="text-xs text-gray-400">Upgrade to PRO for ₱{proPrice}/month to enable the rebook perk — passengers can request you specifically.</p>
-            <button
-              onClick={upgradeToPro}
-              disabled={subscribing}
-              className="w-full h-10 rounded-lg bg-triq-yellow text-triq-dark font-bold text-sm disabled:opacity-40"
-            >
-              {subscribing ? 'Processing...' : `Upgrade to PRO — ₱${proPrice}/month`}
-            </button>
-          </>
+          <div className="space-y-2">
+            <p className="text-xs text-gray-400">Upgrade your subscription to unlock more perks.</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => upgradeToPro('PRO')}
+                disabled={subscribing}
+                className="h-16 rounded-lg bg-triq-cyan/10 border border-triq-cyan/30 text-white font-bold text-sm disabled:opacity-40 flex flex-col items-center justify-center gap-0.5"
+              >
+                <span className="text-triq-cyan text-xs font-bold uppercase tracking-wide">PRO</span>
+                <span className="text-white font-bold">₱{proPrice}<span className="text-xs font-normal text-gray-400">/mo</span></span>
+                <span className="text-[10px] text-gray-400">Rebook perk</span>
+              </button>
+              <button
+                onClick={() => upgradeToPro('ELITE')}
+                disabled={subscribing}
+                className="h-16 rounded-lg bg-triq-yellow/10 border border-triq-yellow/30 text-white font-bold text-sm disabled:opacity-40 flex flex-col items-center justify-center gap-0.5"
+              >
+                <span className="text-triq-yellow text-xs font-bold uppercase tracking-wide">ELITE</span>
+                <span className="text-white font-bold">₱{elitePrice}<span className="text-xs font-normal text-gray-400">/mo</span></span>
+                <span className="text-[10px] text-gray-400">Top-3 + all perks</span>
+              </button>
+            </div>
+            {subscribing && <p className="text-xs text-center text-gray-400">Processing...</p>}
+          </div>
         )}
       </div>
 

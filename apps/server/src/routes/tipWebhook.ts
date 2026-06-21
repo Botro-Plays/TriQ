@@ -94,7 +94,7 @@ router.post('/', async (req, res) => {
           await prisma.subscription.update({ where: { id: subscription.id }, data: { status: 'ACTIVE' } });
           await prisma.driver.update({
             where: { id: subscription.driverId },
-            data: { subscriptionTier: 'PRO', subscriptionStatus: 'ACTIVE', subscriptionExpiresAt: subscription.expiresAt },
+            data: { subscriptionTier: subscription.tier, subscriptionStatus: 'ACTIVE', subscriptionExpiresAt: subscription.expiresAt },
           });
           console.log('[tipWebhook] Subscription', subscription.id, 'activated for driver', subscription.driverId);
         }

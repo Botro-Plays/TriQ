@@ -4,12 +4,16 @@ import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// POST /api/v1/subscriptions/checkout — initiate PayMongo checkout for PRO subscription
+// POST /api/v1/subscriptions/checkout — initiate PayMongo checkout for PRO or ELITE subscription
 router.post('/checkout', async (req: AuthRequest, res) => {
   try {
-    const { driverId } = req.body;
+    const { driverId, tier = 'PRO' } = req.body;
     if (!driverId) {
       res.status(400).json({ error: 'driverId is required' });
+      return;
+    }
+    if (tier !== 'PRO' && tier !== 'ELITE') {
+      res.status(400).json({ error: 'tier must be PRO or ELITE' });
       return;
     }
 
@@ -19,9 +23,15 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       return;
     }
 
-    // Read price from SystemConfig (set by admin), default ₱50
-    const priceConfig = await prisma.systemConfig.findUnique({ where: { key: 'PAYMONGO_PRO_PRICE' } });
-    const PRO_PRICE_CENTAVOS = priceConfig?.value ? parseInt(priceConfig.value, 10) : 5000;
+    // Read prices from SystemConfig (set by admin)
+    const [proConfig, eliteConfig] = await Promise.all([
+      prisma.systemConfig.findUnique({ where: { key: 'PAYMONGO_PRO_PRICE' } }),
+      prisma.systemConfig.findUnique({ where: { key: 'PAYMONGO_ELITE_PRICE' } }),
+    ]);
+    const PRO_PRICE_CENTAVOS = proConfig?.value ? parseInt(proConfig.value, 10) : 5000;
+    const ELITE_PRICE_CENTAVOS = eliteConfig?.value ? parseInt(eliteConfig.value, 10) : 9900;
+    const PRICE_CENTAVOS = tier === 'ELITE' ? ELITE_PRICE_CENTAVOS : PRO_PRICE_CENTAVOS;
+    const TIER_LABEL = tier === 'ELITE' ? 'TriQ Elite' : 'TriQ Pro';
 
     // Check SystemConfig first, then fall back to env var
     const paymongoConfig = await prisma.systemConfig.findUnique({ where: { key: 'PAYMONGO_SECRET_KEY' } });
@@ -34,9 +44,9 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       const sub = await prisma.subscription.create({
         data: {
           driverId,
-          tier: 'PRO',
+          tier,
           status: 'ACTIVE',
-          amount: PRO_PRICE_CENTAVOS,
+          amount: PRICE_CENTAVOS,
           startedAt: new Date(),
           expiresAt,
         },
@@ -45,7 +55,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       await prisma.driver.update({
         where: { id: driverId },
         data: {
-          subscriptionTier: 'PRO',
+          subscriptionTier: tier,
           subscriptionStatus: 'ACTIVE',
           subscriptionExpiresAt: expiresAt,
         },
@@ -68,11 +78,11 @@ router.post('/checkout', async (req: AuthRequest, res) => {
             send_email_receipt: false,
             show_description: true,
             show_line_items: true,
-            description: 'TriQ Pro Subscription — Monthly',
+            description: `${TIER_LABEL} Subscription — Monthly`,
             line_items: [
               {
-                name: 'TriQ Pro (1 month)',
-                amount: PRO_PRICE_CENTAVOS,
+                name: `${TIER_LABEL} (1 month)`,
+                amount: PRICE_CENTAVOS,
                 currency: 'PHP',
                 quantity: 1,
               },
@@ -104,9 +114,9 @@ router.post('/checkout', async (req: AuthRequest, res) => {
     const sub = await prisma.subscription.create({
       data: {
         driverId,
-        tier: 'PRO',
+        tier,
         status: 'PENDING',
-        amount: PRO_PRICE_CENTAVOS,
+        amount: PRICE_CENTAVOS,
         paymongoId: paymentIntentId,
         startedAt: new Date(),
         expiresAt,
@@ -121,12 +131,19 @@ router.post('/checkout', async (req: AuthRequest, res) => {
   }
 });
 
-// GET /api/v1/subscriptions/price — return current PRO subscription price
+// GET /api/v1/subscriptions/price — return current PRO and ELITE subscription prices
 router.get('/price', async (_req, res) => {
   try {
-    const priceConfig = await prisma.systemConfig.findUnique({ where: { key: 'PAYMONGO_PRO_PRICE' } });
-    const centavos = priceConfig?.value ? parseInt(priceConfig.value, 10) : 5000;
-    res.json({ centavos, php: centavos / 100 });
+    const [proConfig, eliteConfig] = await Promise.all([
+      prisma.systemConfig.findUnique({ where: { key: 'PAYMONGO_PRO_PRICE' } }),
+      prisma.systemConfig.findUnique({ where: { key: 'PAYMONGO_ELITE_PRICE' } }),
+    ]);
+    const proCentavos = proConfig?.value ? parseInt(proConfig.value, 10) : 5000;
+    const eliteCentavos = eliteConfig?.value ? parseInt(eliteConfig.value, 10) : 9900;
+    res.json({
+      pro: { centavos: proCentavos, php: proCentavos / 100 },
+      elite: { centavos: eliteCentavos, php: eliteCentavos / 100 },
+    });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get price', message: err.message });
   }

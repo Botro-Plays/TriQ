@@ -764,6 +764,7 @@ router.get('/paymongo', async (_req, res) => {
       webhookUrl: `https://${process.env.WEB_APP_URL ? new URL(process.env.WEB_APP_URL).host : 'triq.dpdns.org'}/api/v1/tips/webhook`,
       isConfigured: !!(map.PAYMONGO_SECRET_KEY && map.PAYMONGO_PUBLIC_KEY),
       proSubscriptionPrice: map.PAYMONGO_PRO_PRICE ? parseInt(map.PAYMONGO_PRO_PRICE, 10) : 5000,
+      eliteSubscriptionPrice: map.PAYMONGO_ELITE_PRICE ? parseInt(map.PAYMONGO_ELITE_PRICE, 10) : 9900,
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get PayMongo config', message: err.message });
@@ -782,6 +783,11 @@ router.put('/paymongo', async (req, res) => {
     if (proSubscriptionPrice !== undefined) {
       const priceCentavos = Math.max(10000, Math.round(parseFloat(proSubscriptionPrice) * 100));
       updates.push({ key: 'PAYMONGO_PRO_PRICE', value: String(priceCentavos), description: 'TriQ Pro subscription price in centavos' });
+    }
+    const { eliteSubscriptionPrice } = req.body;
+    if (eliteSubscriptionPrice !== undefined) {
+      const priceCentavos = Math.max(10000, Math.round(parseFloat(eliteSubscriptionPrice) * 100));
+      updates.push({ key: 'PAYMONGO_ELITE_PRICE', value: String(priceCentavos), description: 'TriQ Elite subscription price in centavos' });
     }
 
     for (const u of updates) {

@@ -9,6 +9,7 @@ interface PayMongoConfig {
   webhookUrl: string;
   isConfigured: boolean;
   proSubscriptionPrice: number; // in centavos
+  eliteSubscriptionPrice: number; // in centavos
 }
 
 export default function AdminPayMongo() {
@@ -22,6 +23,7 @@ export default function AdminPayMongo() {
   const [publicKey, setPublicKey] = useState('');
   const [webhookSecret, setWebhookSecret] = useState('');
   const [proPrice, setProPrice] = useState('');
+  const [elitePrice, setElitePrice] = useState('');
 
   useEffect(() => {
     api.get('/admin/paymongo')
@@ -40,12 +42,14 @@ export default function AdminPayMongo() {
         publicKey: publicKey || undefined,
         webhookSecret: webhookSecret || undefined,
         proSubscriptionPrice: proPrice !== '' ? parseFloat(proPrice) : undefined,
+        eliteSubscriptionPrice: elitePrice !== '' ? parseFloat(elitePrice) : undefined,
       });
       setSaved(true);
       setSecretKey('');
       setPublicKey('');
       setWebhookSecret('');
       setProPrice('');
+      setElitePrice('');
       setTimeout(() => setSaved(false), 3000);
       const res = await api.get('/admin/paymongo');
       setConfig(res.data);
@@ -212,9 +216,32 @@ export default function AdminPayMongo() {
           </p>
         </div>
 
+        {/* ELITE Subscription Price */}
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-gray-400">
+            ELITE Subscription Price <span className="text-triq-yellow">(₱/month)</span>
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₱</span>
+            <input
+              type="number"
+              min="100"
+              step="1"
+              value={elitePrice}
+              onChange={(e) => setElitePrice(e.target.value)}
+              placeholder={config ? String(config.eliteSubscriptionPrice / 100) : '99'}
+              className="w-full h-10 pl-7 pr-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+            />
+          </div>
+          <p className="text-[10px] text-gray-500">
+            Current price: <span className="text-white font-medium">₱{config ? (config.eliteSubscriptionPrice / 100).toFixed(2) : '99.00'}/month</span>
+            {' '}· Minimum ₱100. Leave blank to keep current.
+          </p>
+        </div>
+
         <button
           onClick={save}
-          disabled={saving || (!secretKey && !publicKey && !webhookSecret && proPrice === '')}
+          disabled={saving || (!secretKey && !publicKey && !webhookSecret && proPrice === '' && elitePrice === '')}
           className="w-full h-10 rounded-lg bg-triq-cyan text-triq-dark font-bold text-sm disabled:opacity-40 flex items-center justify-center gap-2"
         >
           {saving ? 'Saving...' : saved ? (

@@ -31,6 +31,7 @@ enum DriverStatus {
 enum SubscriptionTier {
   FREE
   PRO
+  ELITE
 }
 
 enum SubscriptionStatus {
