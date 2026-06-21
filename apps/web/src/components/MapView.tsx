@@ -52,6 +52,10 @@ export default function MapView({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Record<string, L.Marker>>({});
+  const onMapClickRef = useRef(onMapClick);
+
+  // Keep ref updated so the map always calls the latest callback
+  onMapClickRef.current = onMapClick;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -62,11 +66,10 @@ export default function MapView({
       maxZoom: 19,
     }).addTo(map);
 
-    if (onMapClick) {
-      map.on('click', (e: L.LeafletMouseEvent) => {
-        onMapClick(e.latlng.lat, e.latlng.lng);
-      });
-    }
+    // Use ref to always call the latest onMapClick
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
+    });
 
     mapRef.current = map;
 

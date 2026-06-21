@@ -3,7 +3,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
 import { getCurrentLocation, type GeoError } from '../../lib/geolocation';
-import { Crosshair } from 'lucide-react';
+import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X } from 'lucide-react';
 
 const DIGOS_CENTER: [number, number] = [6.7500, 125.3573];
 
@@ -39,6 +39,11 @@ export default function PassengerHome() {
   const [error, setError] = useState('');
   const [passengerId, setPassengerId] = useState<string | null>(null);
   const [passengerCount, setPassengerCount] = useState(1);
+  const [hasSeniorCitizen, setHasSeniorCitizen] = useState(false);
+  const [hasStudent, setHasStudent] = useState(false);
+  const [hasExtraBaggage, setHasExtraBaggage] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState('');
 
   // Get passenger profile
   useEffect(() => {
@@ -97,9 +102,6 @@ export default function PassengerHome() {
     }
   };
 
-  const [locating, setLocating] = useState(false);
-  const [geoError, setGeoError] = useState('');
-
   const useMyLocation = async () => {
     setLocating(true);
     setGeoError('');
@@ -129,6 +131,9 @@ export default function PassengerHome() {
         dropoffLng: dropoff.lng,
         dropoffAddress: dropoff.address,
         passengerCount,
+        hasSeniorCitizen,
+        hasStudent,
+        hasExtraBaggage,
       });
       setStep('searching');
     } catch (err: any) {
@@ -156,12 +161,26 @@ export default function PassengerHome() {
 
   const mapCenter: [number, number] = pickup ? [pickup.lat, pickup.lng] : DIGOS_CENTER;
 
+  const toggleChip = (active: boolean, setter: (v: boolean) => void, icon: React.ReactNode, label: string) => (
+    <button
+      onClick={() => setter(!active)}
+      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all active:scale-95 ${
+        active
+          ? 'bg-triq-cyan/20 text-triq-cyan border border-triq-cyan/40'
+          : 'bg-triq-light/10 text-gray-400 border border-triq-light/20'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-triq-yellow">Book a Ride</h2>
+        <h2 className="text-xl font-bold text-triq-yellow">Book a Ride</h2>
         {step === 'idle' && (
-          <span className="text-xs text-gray-400">{nearbyDrivers.length} drivers nearby</span>
+          <span className="text-xs text-gray-400">{nearbyDrivers.length} nearby</span>
         )}
       </div>
 
@@ -174,54 +193,58 @@ export default function PassengerHome() {
       {step === 'active' && activeRide ? (
         <ActiveRideCard ride={activeRide} onCancel={cancelRide} />
       ) : step === 'searching' ? (
-        <div className="bg-triq-slate rounded-xl border border-triq-light/20 p-6 text-center">
+        <div className="card p-6 text-center">
           <div className="inline-block w-8 h-8 border-2 border-triq-cyan/30 border-t-triq-cyan rounded-full animate-spin mb-3" />
           <p className="text-white font-semibold">Searching for drivers...</p>
-          <p className="text-gray-400 text-sm mt-1">Waiting for a driver to accept your ride</p>
+          <p className="text-gray-400 text-sm mt-1">Waiting for a driver to accept</p>
           <button onClick={cancelRide} className="mt-4 text-sm text-red-400 hover:text-red-300">
             Cancel request
           </button>
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Pickup & Dropoff inputs */}
-          <div className="bg-triq-slate rounded-xl border border-triq-light/20 p-4 space-y-3">
+          {/* Location card */}
+          <div className="card p-3 sm:p-4 space-y-3">
+            {/* Pickup */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
-                Pickup Location
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+                <MapPin size={12} className="text-green-400" /> Pickup
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={pickup?.address || ''}
                   readOnly
-                  placeholder="Tap map or use location"
-                  className="flex-1 h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+                  placeholder="Use GPS or tap map"
+                  className="flex-1 h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm truncate"
                 />
                 <button
-                  onClick={() => setSelecting('pickup')}
-                  className={`px-3 h-10 rounded-lg text-sm font-medium ${selecting === 'pickup' ? 'bg-triq-cyan text-triq-dark' : 'bg-triq-light/10 text-gray-300'}`}
+                  onClick={() => setSelecting(selecting === 'pickup' ? null : 'pickup')}
+                  className={`px-2.5 h-10 rounded-lg text-xs font-medium shrink-0 flex items-center gap-1 ${
+                    selecting === 'pickup' ? 'bg-triq-cyan text-triq-dark' : 'bg-triq-light/10 text-gray-300'
+                  }`}
                 >
-                  Map
+                  <MapPin size={14} />
+                  Pin
                 </button>
                 <button
                   onClick={useMyLocation}
                   disabled={locating}
-                  className="px-3 h-10 rounded-lg text-sm font-medium bg-triq-light/10 text-gray-300 hover:bg-triq-light/20 disabled:opacity-40 flex items-center gap-1.5"
+                  className="px-2.5 h-10 rounded-lg text-xs font-medium shrink-0 bg-triq-light/10 text-gray-300 hover:bg-triq-light/20 disabled:opacity-40 flex items-center gap-1"
                 >
                   {locating ? (
                     <span className="inline-block w-3.5 h-3.5 border-2 border-triq-cyan/30 border-t-triq-cyan rounded-full animate-spin" />
                   ) : (
                     <Crosshair size={14} />
                   )}
-                  GPS
                 </button>
               </div>
             </div>
 
+            {/* Dropoff */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
-                Dropoff Location
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+                <Navigation size={12} className="text-red-400" /> Dropoff
               </label>
               <div className="flex gap-2">
                 <input
@@ -229,47 +252,41 @@ export default function PassengerHome() {
                   value={dropoff?.address || ''}
                   readOnly
                   placeholder="Tap map to set destination"
-                  className="flex-1 h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+                  className="flex-1 h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm truncate"
                 />
                 <button
-                  onClick={() => setSelecting('dropoff')}
-                  className={`px-3 h-10 rounded-lg text-sm font-medium ${selecting === 'dropoff' ? 'bg-triq-cyan text-triq-dark' : 'bg-triq-light/10 text-gray-300'}`}
+                  onClick={() => setSelecting(selecting === 'dropoff' ? null : 'dropoff')}
+                  className={`px-2.5 h-10 rounded-lg text-xs font-medium shrink-0 flex items-center gap-1 ${
+                    selecting === 'dropoff' ? 'bg-triq-cyan text-triq-dark' : 'bg-triq-light/10 text-gray-300'
+                  }`}
                 >
-                  Map
+                  <Navigation size={14} />
+                  Pin
                 </button>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
-                Passengers
-              </label>
-              <select
-                value={passengerCount}
-                onChange={(e) => setPassengerCount(parseInt(e.target.value))}
-                className="h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
-              >
-                {[1, 2, 3, 4].map((n) => (
-                  <option key={n} value={n}>{n} passenger{n > 1 ? 's' : ''}</option>
-                ))}
-              </select>
-            </div>
+            {/* Selecting hint */}
+            {selecting && (
+              <div className="flex items-center justify-between bg-triq-cyan/10 border border-triq-cyan/30 rounded-lg px-3 py-2">
+                <p className="text-triq-cyan text-xs">
+                  Tap map to set {selecting === 'pickup' ? 'pickup' : 'dropoff'}
+                </p>
+                <button onClick={() => setSelecting(null)} className="text-triq-cyan/70 hover:text-triq-cyan">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
+            {geoError && (
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2">
+                <p className="text-orange-400 text-xs">{geoError}</p>
+              </div>
+            )}
           </div>
 
-          {geoError && (
-            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2">
-              <p className="text-orange-400 text-xs">{geoError}</p>
-            </div>
-          )}
-
-          {selecting && (
-            <div className="bg-triq-cyan/10 border border-triq-cyan/30 rounded-lg px-3 py-2 text-sm text-triq-cyan">
-              Tap the map to set {selecting === 'pickup' ? 'pickup' : 'dropoff'} location
-            </div>
-          )}
-
-          {/* Map */}
-          <div className="h-80 rounded-xl overflow-hidden border border-triq-light/20">
+          {/* Map — full width, taller on mobile */}
+          <div className="h-64 sm:h-80 rounded-xl overflow-hidden border border-triq-light/20 relative">
             <MapView
               center={mapCenter}
               zoom={14}
@@ -277,24 +294,69 @@ export default function PassengerHome() {
               onMapClick={handleMapClick}
               fitBounds={!!(pickup && dropoff)}
             />
+            {selecting && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-triq-dark/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-triq-cyan/30 z-[1000] pointer-events-none">
+                <p className="text-triq-cyan text-xs font-medium">
+                  Tap to pin {selecting === 'pickup' ? 'pickup' : 'dropoff'}
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Nearby drivers list */}
+          {/* Ride details — passenger count + toggles */}
+          <div className="card p-3 sm:p-4 space-y-3">
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                <Users size={12} className="text-triq-cyan" /> Passengers
+              </label>
+              <div className="flex gap-1.5 flex-wrap">
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setPassengerCount(n)}
+                    className={`w-9 h-9 rounded-lg text-sm font-bold transition-all active:scale-90 ${
+                      passengerCount === n
+                        ? 'bg-triq-yellow text-triq-dark'
+                        : 'bg-triq-light/10 text-gray-400 hover:bg-triq-light/20'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2 block">
+                Additional Info
+              </label>
+              <div className="flex gap-1.5 flex-wrap">
+                {toggleChip(hasSeniorCitizen, setHasSeniorCitizen, <Accessibility size={14} />, 'Senior')}
+                {toggleChip(hasStudent, setHasStudent, <GraduationCap size={14} />, 'Student')}
+                {toggleChip(hasExtraBaggage, setHasExtraBaggage, <Backpack size={14} />, 'Baggage')}
+              </div>
+              {(hasSeniorCitizen || hasStudent) && (
+                <p className="text-[11px] text-gray-500 mt-1.5">20% LGU discount may apply</p>
+              )}
+            </div>
+          </div>
+
+          {/* Nearby drivers — compact */}
           {pickup && nearbyDrivers.length > 0 && (
-            <div className="bg-triq-slate rounded-xl border border-triq-light/20 p-3">
+            <div className="card p-3">
               <p className="text-xs text-gray-400 mb-2">Nearby drivers</p>
               <div className="space-y-1.5">
                 {nearbyDrivers.slice(0, 3).map((d) => (
                   <div key={d.id} className="flex items-center justify-between text-sm">
-                    <span className="text-white">{d.name}</span>
-                    <span className="text-gray-400">{d.distance.toFixed(1)} km · ⭐ {d.rating.toFixed(1)}</span>
+                    <span className="text-white truncate">{d.name}</span>
+                    <span className="text-gray-400 shrink-0 ml-2">{d.distance.toFixed(1)}km · ⭐{d.rating.toFixed(1)}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Request button */}
+          {/* Request button — sticky at bottom */}
           <button
             onClick={requestRide}
             disabled={loading || !pickup || !dropoff}
@@ -324,7 +386,7 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: () => 
   };
 
   return (
-    <div className="bg-triq-slate rounded-xl border border-triq-light/20 p-4 space-y-4">
+    <div className="card p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-white">{statusLabels[ride.status] || ride.status}</h3>
         <span className="text-triq-yellow font-bold text-lg">₱{fare.toFixed(0)}</span>
@@ -332,28 +394,28 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: () => 
 
       <div className="space-y-2 text-sm">
         <div className="flex items-start gap-2">
-          <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5" />
-          <div>
+          <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5 shrink-0" />
+          <div className="min-w-0">
             <p className="text-gray-400 text-xs">Pickup</p>
-            <p className="text-white">{ride.pickupAddress}</p>
+            <p className="text-white truncate">{ride.pickupAddress}</p>
           </div>
         </div>
         <div className="flex items-start gap-2">
-          <div className="w-2 h-2 rounded-full bg-red-500 mt-1.5" />
-          <div>
+          <div className="w-2 h-2 rounded-full bg-red-500 mt-1.5 shrink-0" />
+          <div className="min-w-0">
             <p className="text-gray-400 text-xs">Dropoff</p>
-            <p className="text-white">{ride.dropoffAddress}</p>
+            <p className="text-white truncate">{ride.dropoffAddress}</p>
           </div>
         </div>
       </div>
 
       {ride.driver && (
         <div className="bg-triq-dark rounded-lg p-3 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-triq-cyan/20 flex items-center justify-center text-triq-cyan font-bold">
+          <div className="w-10 h-10 rounded-full bg-triq-cyan/20 flex items-center justify-center text-triq-cyan font-bold shrink-0">
             {ride.driver.name.charAt(0)}
           </div>
-          <div className="flex-1">
-            <p className="text-white font-semibold text-sm">{ride.driver.name}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-semibold text-sm truncate">{ride.driver.name}</p>
             <p className="text-gray-400 text-xs">{ride.driver.plateNumber} · ⭐ {ride.driver.rating.toFixed(1)}</p>
           </div>
         </div>
