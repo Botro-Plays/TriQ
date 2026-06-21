@@ -78,7 +78,7 @@ function App() {
             path="/passenger/leaderboard"
             element={
               <ProtectedRoute allowedRoles={['PASSENGER']}>
-                <Leaderboard role="passengers" />
+                <Leaderboard />
               </ProtectedRoute>
             }
           />
@@ -112,7 +112,7 @@ function App() {
             path="/driver/leaderboard"
             element={
               <ProtectedRoute allowedRoles={['DRIVER']}>
-                <Leaderboard role="drivers" />
+                <Leaderboard />
               </ProtectedRoute>
             }
           />

@@ -44,7 +44,13 @@ const PERIODS = [
   { key: 'alltime', label: 'All Time' },
 ];
 
-export default function Leaderboard({ role }: { role: Role }) {
+const ROLE_TABS: { key: Role; label: string }[] = [
+  { key: 'drivers', label: 'Drivers' },
+  { key: 'passengers', label: 'Passengers' },
+];
+
+export default function Leaderboard() {
+  const [role, setRole] = useState<Role>('drivers');
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('week');
@@ -60,6 +66,13 @@ export default function Leaderboard({ role }: { role: Role }) {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [role, period, metric, page]);
+
+  const switchRole = (r: Role) => {
+    setRole(r);
+    setMetric('rides');
+    setPeriod('week');
+    setPage(1);
+  };
 
   const formatScore = (score: number, metric: string) => {
     if (metric === 'earnings' || metric === 'tips') return `₱${(score / 100).toFixed(0)}`;
@@ -85,9 +98,20 @@ export default function Leaderboard({ role }: { role: Role }) {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Trophy size={24} className="text-triq-yellow" />
-        <h1 className="text-2xl font-bold text-triq-yellow">
-          {role === 'drivers' ? 'Driver' : 'Passenger'} Leaderboard
-        </h1>
+        <h1 className="text-2xl font-bold text-triq-yellow">Leaderboards</h1>
+      </div>
+
+      {/* Role toggle — Drivers / Passengers */}
+      <div className="flex gap-2">
+        {ROLE_TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => switchRole(t.key)}
+            className={`px-4 py-2 rounded-lg text-sm font-bold ${role === t.key ? 'bg-triq-yellow/20 text-triq-yellow border border-triq-yellow/40' : 'bg-triq-light/10 text-gray-400 border border-transparent'}`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* Period tabs */}
