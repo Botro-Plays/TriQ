@@ -82,8 +82,10 @@ app.use('/api/v1/users', authMiddleware, userRoutes);
 app.use('/api/v1/passengers', authMiddleware, passengerRoutes);
 app.use('/api/v1/drivers', authMiddleware, driverRoutes);
 app.use('/api/v1/rides', authMiddleware, rideRoutes);
+// Webhook MUST be before auth-protected tips route — PayMongo sends no JWT
+// Use express.raw so we can verify the HMAC signature over the original bytes
+app.use('/api/v1/tips/webhook', express.raw({ type: 'application/json' }), tipWebhookRoutes);
 app.use('/api/v1/tips', authMiddleware, tipRoutes);
-app.use('/api/v1/tips/webhook', tipWebhookRoutes); // public — PayMongo calls this
 app.use('/api/v1/admin', authMiddleware, requireRole('OWNER', 'STAFF'), adminRoutes);
 app.use('/api/v1/reports', authMiddleware, reportRoutes);
 app.use('/api/v1/leaderboards', authMiddleware, leaderboardRoutes);

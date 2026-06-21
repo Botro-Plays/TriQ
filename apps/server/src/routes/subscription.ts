@@ -92,6 +92,8 @@ router.post('/checkout', async (req: AuthRequest, res) => {
 
     const checkoutId = session.data.id;
     const checkoutUrl = session.data.attributes.checkout_url;
+    // Store payment_intent_id — this is what the payment.paid webhook carries
+    const paymentIntentId: string = session.data.attributes?.payment_intent?.id ?? checkoutId;
 
     // Create pending subscription — will be activated by webhook when payment is confirmed
     const expiresAt = new Date();
@@ -103,7 +105,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
         tier: 'PRO',
         status: 'PENDING',
         amount: PRO_PRICE_CENTAVOS,
-        paymongoId: checkoutId,
+        paymongoId: paymentIntentId,
         startedAt: new Date(),
         expiresAt,
       },

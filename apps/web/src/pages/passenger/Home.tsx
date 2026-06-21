@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
@@ -57,6 +57,8 @@ interface ActiveRide {
 export default function PassengerHome() {
   const { user } = useAuthStore();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [tipBanner, setTipBanner] = useState<'success' | 'failed' | null>(null);
   const [step, setStep] = useState<'idle' | 'searching' | 'active'>('idle');
   const [pickup, setPickup] = useState<{ lat: number; lng: number; address: string } | null>(null);
   const [dropoff, setDropoff] = useState<{ lat: number; lng: number; address: string } | null>(null);
@@ -88,6 +90,19 @@ export default function PassengerHome() {
       .then((res) => setPassengerId(res.data.id))
       .catch(() => {});
   }, [user]);
+
+  // Handle PayMongo redirect back with ?tip=success or ?tip=failed
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tip = params.get('tip');
+    if (tip === 'success' || tip === 'failed') {
+      setTipBanner(tip);
+      // Clean up URL without reloading
+      navigate('/passenger', { replace: true, state: location.state });
+      setTimeout(() => setTipBanner(null), 5000);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handle re-book navigation from History page
   const [rebookDriverId, setRebookDriverId] = useState<string | null>(null);
@@ -303,6 +318,21 @@ export default function PassengerHome() {
 
   return (
     <div className="space-y-3">
+      {tipBanner === 'success' && (
+        <div className="bg-green-500/15 border border-green-500/30 rounded-lg px-4 py-3 flex items-center gap-2">
+          <span className="text-green-400 text-xl">💚</span>
+          <div>
+            <p className="text-green-400 text-sm font-semibold">Thank you for your support!</p>
+            <p className="text-xs text-gray-400">Your tip to TriQ platform was received.</p>
+          </div>
+        </div>
+      )}
+      {tipBanner === 'failed' && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+          <p className="text-red-400 text-sm font-semibold">Payment was not completed.</p>
+          <p className="text-xs text-gray-400">Your tip was not charged. You can try again anytime.</p>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-triq-yellow">Book a Ride</h2>
         {step === 'idle' && (

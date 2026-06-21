@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
@@ -67,6 +68,9 @@ interface EarningsSummary {
 
 export default function DriverHome() {
   const { user } = useAuthStore();
+  const routerLocation = useLocation();
+  const navigate = useNavigate();
+  const [tipBanner, setTipBanner] = useState<'success' | 'failed' | null>(null);
   const [isOnline, setIsOnline] = useState(false);
   const [driverId, setDriverId] = useState<string | null>(null);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -77,6 +81,18 @@ export default function DriverHome() {
   const [earnings, setEarnings] = useState<EarningsSummary | null>(null);
   const [counterOfferFare, setCounterOfferFare] = useState<string>('');
   const [counterOfferRideId, setCounterOfferRideId] = useState<string | null>(null);
+  // Handle PayMongo redirect back with ?tip=success or ?tip=failed
+  useEffect(() => {
+    const params = new URLSearchParams(routerLocation.search);
+    const tip = params.get('tip');
+    if (tip === 'success' || tip === 'failed') {
+      setTipBanner(tip);
+      navigate('/driver', { replace: true });
+      setTimeout(() => setTipBanner(null), 5000);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const watchIdRef = useRef<number | null>(null);
   const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const speedHistoryRef = useRef<{ time: number; lat: number; lng: number }[]>([]);
@@ -361,6 +377,21 @@ export default function DriverHome() {
 
   return (
     <div className="space-y-4">
+      {tipBanner === 'success' && (
+        <div className="bg-green-500/15 border border-green-500/30 rounded-lg px-4 py-3 flex items-center gap-2">
+          <span className="text-green-400 text-xl">💚</span>
+          <div>
+            <p className="text-green-400 text-sm font-semibold">Thank you for your support!</p>
+            <p className="text-xs text-gray-400">Your tip to TriQ platform was received.</p>
+          </div>
+        </div>
+      )}
+      {tipBanner === 'failed' && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+          <p className="text-red-400 text-sm font-semibold">Payment was not completed.</p>
+          <p className="text-xs text-gray-400">Your tip was not charged. You can try again anytime.</p>
+        </div>
+      )}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-2xl font-bold text-triq-yellow">Driver Dashboard</h2>
         <div className="flex items-center gap-2">

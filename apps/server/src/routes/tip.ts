@@ -91,6 +91,8 @@ router.post('/', async (req: AuthRequest, res) => {
 
     const checkoutId = session.data.id;
     const checkoutUrl = session.data.attributes.checkout_url;
+    // Store payment_intent_id — this is what the payment.paid webhook carries
+    const paymentIntentId: string = session.data.attributes?.payment_intent?.id ?? checkoutId;
 
     const tip = await prisma.tip.create({
       data: {
@@ -99,7 +101,7 @@ router.post('/', async (req: AuthRequest, res) => {
         rideId: rideId || null,
         amount,
         status: 'PENDING',
-        paymongoId: checkoutId,
+        paymongoId: paymentIntentId,
       },
     });
 
