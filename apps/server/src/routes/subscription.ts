@@ -75,10 +75,9 @@ router.post('/checkout', async (req: AuthRequest, res) => {
                 quantity: 1,
               },
             ],
-            payment_method_types: ['gcash', 'maya', 'card'],
+            payment_method_types: ['gcash', 'maya', 'card', 'qrph'],
             success_url: `${baseUrl}/driver?subscription=success`,
             failed_url: `${baseUrl}/driver?subscription=failed`,
-            reference_number: '',
           },
         },
       }),
@@ -86,6 +85,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
 
     const session = await response.json() as any;
     if (!response.ok) {
+      console.error('[subscription] PayMongo checkout error:', JSON.stringify(session));
       res.status(502).json({ error: 'PayMongo checkout creation failed', details: session });
       return;
     }

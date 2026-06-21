@@ -38,7 +38,8 @@ export default function TipModal({ open, onClose, rideId }: TipModalProps) {
         }, 2000);
       }
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to create tip');
+      const detail = err?.response?.data?.details?.errors?.[0];
+      setError(detail ? `${detail.detail || detail.title}` : err?.response?.data?.error || 'Failed to create tip');
     } finally {
       setTipping(false);
     }
