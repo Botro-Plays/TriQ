@@ -44,24 +44,35 @@ async function calculatePerPersonFare(pickupLat: number, pickupLng: number, drop
   return { perPersonFare, distanceKm: straightLineKm, baseFare, perKmRate };
 }
 
-// Calculate total fare with per-pax pricing and LGU discount
+// Extra baggage surcharge in centavos
+const EXTRA_BAGGAGE_FEE = 500; // ₱5
+
+// Calculate total fare with per-pax pricing, LGU discount, and baggage fee
 async function calculateFare(
   pickupLat: number, pickupLng: number,
   dropoffLat: number, dropoffLng: number,
   passengerCount: number = 1,
   hasSeniorCitizen: boolean = false,
-  hasStudent: boolean = false
+  hasStudent: boolean = false,
+  hasExtraBaggage: boolean = false
 ): Promise<number> {
   const { perPersonFare } = await calculatePerPersonFare(pickupLat, pickupLng, dropoffLat, dropoffLng);
 
   // Advanced per-pax discount: senior/student passengers get 20% off their portion
+  let totalFare: number;
   if (hasSeniorCitizen || hasStudent) {
     // Simplified: at least one qualifying passenger — 20% off entire fare
-    // (Advanced per-pax counting requires schema migration to store counts)
-    return Math.round(perPersonFare * passengerCount * 0.8);
+    totalFare = Math.round(perPersonFare * passengerCount * 0.8);
+  } else {
+    totalFare = perPersonFare * passengerCount;
   }
 
-  return perPersonFare * passengerCount;
+  // Extra baggage surcharge (flat, once per ride)
+  if (hasExtraBaggage) {
+    totalFare += EXTRA_BAGGAGE_FEE;
+  }
+
+  return totalFare;
 }
 
 // POST /api/v1/rides — create ride request
@@ -95,7 +106,7 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    const estimatedFare = await calculateFare(pickupLat, pickupLng, dropoffLat, dropoffLng, passengerCount, hasSeniorCitizen, hasStudent);
+    const estimatedFare = await calculateFare(pickupLat, pickupLng, dropoffLat, dropoffLng, passengerCount, hasSeniorCitizen, hasStudent, hasExtraBaggage);
 
     const ride = await prisma.ride.create({
       data: {
@@ -170,6 +181,7 @@ router.get('/estimate', async (req, res) => {
     const passengerCount = parseInt(req.query.passengerCount as string) || 1;
     const seniorCount = parseInt(req.query.seniorCount as string) || 0;
     const studentCount = parseInt(req.query.studentCount as string) || 0;
+    const hasExtraBaggage = req.query.hasExtraBaggage === 'true';
 
     if (isNaN(pickupLat) || isNaN(dropoffLat)) {
       res.status(400).json({ error: 'pickupLat, pickupLng, dropoffLat, dropoffLng are required' });
@@ -181,9 +193,16 @@ router.get('/estimate', async (req, res) => {
     // Advanced per-pax discount: regular passengers pay full, senior/student pay 80%
     const discountCount = Math.min(seniorCount + studentCount, passengerCount);
     const regularCount = passengerCount - discountCount;
-    const estimatedFare = Math.round(
+    let estimatedFare = Math.round(
       (regularCount * perPersonFare) + (discountCount * perPersonFare * 0.8)
     );
+
+    // Extra baggage surcharge
+    let baggageFee = 0;
+    if (hasExtraBaggage) {
+      baggageFee = EXTRA_BAGGAGE_FEE;
+      estimatedFare += baggageFee;
+    }
 
     res.json({
       estimatedFare,
@@ -196,6 +215,8 @@ router.get('/estimate', async (req, res) => {
       seniorCount,
       studentCount,
       discountApplied: discountCount > 0,
+      hasExtraBaggage,
+      baggageFee,
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to estimate fare', message: err.message });

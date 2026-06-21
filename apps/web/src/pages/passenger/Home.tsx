@@ -3,7 +3,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
 import { getCurrentLocation, type GeoError } from '../../lib/geolocation';
-import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X, TrendingUp } from 'lucide-react';
+import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X, TrendingUp, Search, Heart } from 'lucide-react';
 
 const DIGOS_CENTER: [number, number] = [6.7500, 125.3573];
 
@@ -44,8 +44,12 @@ export default function PassengerHome() {
   const [hasExtraBaggage, setHasExtraBaggage] = useState(false);
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState('');
-  const [fareEstimate, setFareEstimate] = useState<{ estimatedFare: number; perPersonFare: number; discountedPerPersonFare: number; distanceKm: number; discountApplied: boolean } | null>(null);
+  const [fareEstimate, setFareEstimate] = useState<{ estimatedFare: number; perPersonFare: number; discountedPerPersonFare: number; distanceKm: number; discountApplied: boolean; baggageFee: number } | null>(null);
   const [estimating, setEstimating] = useState(false);
+  const [tipAmount, setTipAmount] = useState(0);
+  const [dropoffQuery, setDropoffQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<{ lat: number; lng: number; display_name: string }[]>([]);
+  const [searching, setSearching] = useState(false);
 
   // Get passenger profile
   useEffect(() => {
@@ -119,7 +123,24 @@ export default function PassengerHome() {
     }
   };
 
-  // Fetch fare estimate when pickup, dropoff, passenger count, or discount counts change
+  // Nominatim place search for dropoff landmark/address lookup
+  useEffect(() => {
+    if (!dropoffQuery.trim() || dropoffQuery.trim().length < 3) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const timer = setTimeout(() => {
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(dropoffQuery)}&format=json&limit=5&countrycodes=ph&q=Digos+${encodeURIComponent(dropoffQuery)}`)
+        .then((res) => res.json())
+        .then((data) => setSearchResults(data.map((r: any) => ({ lat: parseFloat(r.lat), lng: parseFloat(r.lon), display_name: r.display_name }))))
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearching(false));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [dropoffQuery]);
+
+  // Fetch fare estimate when pickup, dropoff, passenger count, discount counts, or baggage change
   useEffect(() => {
     if (!pickup || !dropoff) {
       setFareEstimate(null);
@@ -136,6 +157,7 @@ export default function PassengerHome() {
           passengerCount,
           seniorCount,
           studentCount,
+          hasExtraBaggage,
         },
       })
         .then((res) => setFareEstimate(res.data))
@@ -143,7 +165,7 @@ export default function PassengerHome() {
         .finally(() => setEstimating(false));
     }, 500);
     return () => clearTimeout(timer);
-  }, [pickup, dropoff, passengerCount, seniorCount, studentCount]);
+  }, [pickup, dropoff, passengerCount, seniorCount, studentCount, hasExtraBaggage]);
 
   const requestRide = async () => {
     if (!passengerId || !pickup || !dropoff) return;
@@ -283,13 +305,41 @@ export default function PassengerHome() {
                 <Navigation size={12} className="text-red-400" /> Dropoff
               </label>
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={dropoff?.address || ''}
-                  readOnly
-                  placeholder="Tap map to set destination"
-                  className="flex-1 h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm truncate"
-                />
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={dropoff ? dropoff.address : dropoffQuery}
+                    onChange={(e) => {
+                      setDropoffQuery(e.target.value);
+                      if (dropoff) setDropoff(null);
+                    }}
+                    placeholder="Search landmark or tap map"
+                    className="w-full h-10 px-3 pl-9 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm truncate"
+                  />
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                  {searching && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-triq-cyan/30 border-t-triq-cyan rounded-full animate-spin" />
+                  )}
+                  {/* Search results dropdown */}
+                  {searchResults.length > 0 && !dropoff && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-triq-dark border border-triq-light/30 rounded-lg shadow-xl z-[1000] max-h-48 overflow-y-auto">
+                      {searchResults.map((r, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setDropoff({ lat: r.lat, lng: r.lng, address: r.display_name.split(',')[0] });
+                            setDropoffQuery('');
+                            setSearchResults([]);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-triq-light/10 border-b border-triq-light/10 last:border-0 truncate"
+                        >
+                          <MapPin size={10} className="inline mr-1.5 text-red-400" />
+                          {r.display_name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => setSelecting(selecting === 'dropoff' ? null : 'dropoff')}
                   className={`px-2.5 h-10 rounded-lg text-xs font-medium shrink-0 flex items-center gap-1 ${
@@ -404,25 +454,62 @@ export default function PassengerHome() {
                 {estimating ? (
                   <span className="inline-block w-4 h-4 border-2 border-triq-cyan/30 border-t-triq-cyan rounded-full animate-spin" />
                 ) : fareEstimate ? (
-                  <span className="text-triq-yellow font-bold text-xl">₱{(fareEstimate.estimatedFare / 100).toFixed(0)}</span>
+                  <span className="text-triq-yellow font-bold text-xl">₱{((fareEstimate.estimatedFare + tipAmount) / 100).toFixed(0)}</span>
                 ) : (
                   <span className="text-gray-500 text-sm">—</span>
                 )}
               </div>
               {fareEstimate && !estimating && (
-                <div className="mt-2 space-y-1 text-xs text-gray-400">
-                  <div className="flex justify-between">
-                    <span>Distance</span>
-                    <span>{fareEstimate.distanceKm.toFixed(2)} km</span>
+                <>
+                  <div className="mt-2 space-y-1 text-xs text-gray-400">
+                    <div className="flex justify-between">
+                      <span>Distance</span>
+                      <span>{fareEstimate.distanceKm.toFixed(2)} km</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Per person</span>
+                      <span>₱{(fareEstimate.perPersonFare / 100).toFixed(0)}{fareEstimate.discountApplied && ` (₱${(fareEstimate.discountedPerPersonFare / 100).toFixed(0)} w/ discount)`}</span>
+                    </div>
+                    {fareEstimate.baggageFee > 0 && (
+                      <div className="flex justify-between">
+                        <span>Baggage fee</span>
+                        <span>₱{(fareEstimate.baggageFee / 100).toFixed(0)}</span>
+                      </div>
+                    )}
+                    {tipAmount > 0 && (
+                      <div className="flex justify-between">
+                        <span>Tip</span>
+                        <span>₱{(tipAmount / 100).toFixed(0)}</span>
+                      </div>
+                    )}
+                    {fareEstimate.discountApplied && (
+                      <p className="text-green-400 text-[11px] mt-1">20% LGU discount applied to qualifying passengers</p>
+                    )}
                   </div>
-                  <div className="flex justify-between">
-                    <span>Per person</span>
-                    <span>₱{(fareEstimate.perPersonFare / 100).toFixed(0)}{fareEstimate.discountApplied && ` (₱${(fareEstimate.discountedPerPersonFare / 100).toFixed(0)} w/ discount)`}</span>
+
+                  {/* Tip buttons */}
+                  <div className="mt-3 pt-3 border-t border-triq-light/10">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Heart size={12} className="text-triq-cyan" />
+                      <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Support TriQ (optional)</span>
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[0, 100, 200, 500, 1000, 1500, 2000].map((amt) => (
+                        <button
+                          key={amt}
+                          onClick={() => setTipAmount(amt)}
+                          className={`px-2.5 h-8 rounded-lg text-xs font-medium transition-all active:scale-90 ${
+                            tipAmount === amt
+                              ? 'bg-triq-cyan text-triq-dark'
+                              : 'bg-triq-light/10 text-gray-400 hover:bg-triq-light/20'
+                          }`}
+                        >
+                          {amt === 0 ? 'None' : `₱${(amt / 100).toFixed(0)}`}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  {fareEstimate.discountApplied && (
-                    <p className="text-green-400 text-[11px] mt-1">20% LGU discount applied to qualifying passengers</p>
-                  )}
-                </div>
+                </>
               )}
             </div>
           )}
@@ -454,7 +541,7 @@ export default function PassengerHome() {
               <>
                 Request Ride
                 {fareEstimate && !loading && (
-                  <span className="text-sm opacity-80">· ₱{(fareEstimate.estimatedFare / 100).toFixed(0)}</span>
+                  <span className="text-sm opacity-80">· ₱{((fareEstimate.estimatedFare + tipAmount) / 100).toFixed(0)}</span>
                 )}
               </>
             )}
