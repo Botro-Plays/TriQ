@@ -25,10 +25,21 @@ router.get('/stats/overview', async (_req, res) => {
     todayStart.setHours(0, 0, 0, 0);
     const todayRides = await prisma.ride.count({ where: { createdAt: { gte: todayStart } } });
 
-    const earningsAgg = await prisma.ride.aggregate({
-      where: { status: 'COMPLETED' },
-      _sum: { finalFare: true },
-    });
+    const [subscriptionAgg, tipAgg, activeSubs, proSubs] = await Promise.all([
+      prisma.subscription.aggregate({
+        where: { status: 'ACTIVE' },
+        _sum: { amount: true },
+      }),
+      prisma.tip.aggregate({
+        where: { status: 'PAID' },
+        _sum: { amount: true },
+      }),
+      prisma.subscription.count({ where: { status: 'ACTIVE' } }),
+      prisma.subscription.count({ where: { status: 'ACTIVE', tier: 'PRO' } }),
+    ]);
+
+    const subscriptionRevenue = subscriptionAgg._sum.amount || 0;
+    const tipRevenue = tipAgg._sum.amount || 0;
 
     res.json({
       totalPassengers,
@@ -40,7 +51,11 @@ router.get('/stats/overview', async (_req, res) => {
       completedRides,
       pendingKyc,
       suspendedDrivers,
-      totalEarnings: earningsAgg._sum.finalFare || 0,
+      subscriptionRevenue,
+      tipRevenue,
+      totalPlatformRevenue: subscriptionRevenue + tipRevenue,
+      activeSubscriptions: activeSubs,
+      proSubscriptions: proSubs,
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get stats', message: err.message });
@@ -308,6 +323,299 @@ router.patch('/users/:id/role', async (req, res) => {
     res.json(user);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to update role', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/subscriptions — list subscriptions
+router.get('/subscriptions', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = 20;
+    const status = req.query.status as string;
+
+    const where: any = {};
+    if (status && status !== 'all') where.status = status;
+
+    const [subs, total] = await Promise.all([
+      prisma.subscription.findMany({
+        where,
+        orderBy: { startedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          driver: { select: { id: true, name: true, plateNumber: true, subscriptionTier: true } },
+        },
+      }),
+      prisma.subscription.count({ where }),
+    ]);
+
+    const revenueAgg = await prisma.subscription.aggregate({
+      where: { status: 'ACTIVE' },
+      _sum: { amount: true },
+    });
+
+    res.json({ subscriptions: subs, total, page, pages: Math.ceil(total / limit), activeRevenue: revenueAgg._sum.amount || 0 });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get subscriptions', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/tips — list tip transactions
+router.get('/tips', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = 20;
+    const status = req.query.status as string;
+
+    const where: any = {};
+    if (status && status !== 'all') where.status = status;
+
+    const [tips, total] = await Promise.all([
+      prisma.tip.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          passenger: { select: { id: true, name: true } },
+          ride: { select: { id: true, driver: { select: { name: true, plateNumber: true } } } },
+        },
+      }),
+      prisma.tip.count({ where }),
+    ]);
+
+    const paidAgg = await prisma.tip.aggregate({
+      where: { status: 'PAID' },
+      _sum: { amount: true },
+    });
+
+    res.json({ tips, total, page, pages: Math.ceil(total / limit), totalPaid: paidAgg._sum.amount || 0 });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get tips', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/passengers — list passengers
+router.get('/passengers', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = 20;
+    const search = req.query.search as string;
+
+    const where: any = {};
+    if (search) {
+      where.name = { contains: search, mode: 'insensitive' };
+    }
+
+    const [passengers, total] = await Promise.all([
+      prisma.passenger.findMany({
+        where,
+        orderBy: { trustScore: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true, name: true, kycStatus: true, trustScore: true,
+          autoCancelledCount: true, userId: true,
+          user: { select: { phoneNumber: true, createdAt: true } },
+          _count: { select: { rides: true, strikes: true } },
+        },
+      }),
+      prisma.passenger.count({ where }),
+    ]);
+
+    res.json({ passengers, total, page, pages: Math.ceil(total / limit) });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get passengers', message: err.message });
+  }
+});
+
+// PATCH /api/v1/admin/passengers/:id/suspend — suspend passenger (set trust score to 0)
+router.patch('/passengers/:id/suspend', async (req, res) => {
+  try {
+    const passenger = await prisma.passenger.update({
+      where: { id: req.params.id },
+      data: { trustScore: 0 },
+    });
+    res.json(passenger);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to suspend passenger', message: err.message });
+  }
+});
+
+// PATCH /api/v1/admin/passengers/:id/unsuspend — restore passenger trust score
+router.patch('/passengers/:id/unsuspend', async (req, res) => {
+  try {
+    const passenger = await prisma.passenger.update({
+      where: { id: req.params.id },
+      data: { trustScore: 100 },
+    });
+    res.json(passenger);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to unsuspend passenger', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/ratings — list reviews/ratings
+router.get('/ratings', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = 20;
+    const minRating = parseInt(req.query.minRating as string) || 0;
+
+    const where: any = {};
+    if (minRating > 0) where.rating = { lte: minRating };
+
+    const [reviews, total] = await Promise.all([
+      prisma.review.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          from: { select: { name: true } },
+          to: { select: { name: true, plateNumber: true } },
+          ride: { select: { id: true, pickupAddress: true, dropoffAddress: true } },
+        },
+      }),
+      prisma.review.count({ where }),
+    ]);
+
+    const avgRating = await prisma.review.aggregate({ _avg: { rating: true } });
+
+    res.json({ reviews, total, page, pages: Math.ceil(total / limit), avgRating: avgRating._avg.rating || 0 });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get ratings', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/strikes — list strikes
+router.get('/strikes', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = 20;
+
+    const [strikes, total] = await Promise.all([
+      prisma.strike.findMany({
+        where: { isActive: true },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          passenger: { select: { name: true } },
+          ride: { select: { id: true, pickupAddress: true } },
+        },
+      }),
+      prisma.strike.count({ where: { isActive: true } }),
+    ]);
+
+    res.json({ strikes, total, page, pages: Math.ceil(total / limit) });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get strikes', message: err.message });
+  }
+});
+
+// PATCH /api/v1/admin/strikes/:id/revoke — revoke a strike
+router.patch('/strikes/:id/revoke', async (req, res) => {
+  try {
+    const strike = await prisma.strike.update({
+      where: { id: req.params.id },
+      data: { isActive: false },
+    });
+    res.json(strike);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to revoke strike', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/emergencies — list emergency events
+router.get('/emergencies', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = 20;
+
+    const [events, total] = await Promise.all([
+      prisma.emergencyEvent.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          ride: { select: { id: true, pickupAddress: true, dropoffAddress: true, passenger: { select: { name: true } }, driver: { select: { name: true, plateNumber: true } } } },
+        },
+      }),
+      prisma.emergencyEvent.count(),
+    ]);
+
+    res.json({ events, total, page, pages: Math.ceil(total / limit) });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get emergencies', message: err.message });
+  }
+});
+
+// PATCH /api/v1/admin/emergencies/:id/resolve — resolve emergency
+router.patch('/emergencies/:id/resolve', async (req, res) => {
+  try {
+    const { notes, status } = req.body;
+    const event = await prisma.emergencyEvent.update({
+      where: { id: req.params.id },
+      data: {
+        status: status || 'RESOLVED',
+        resolvedAt: new Date(),
+        resolvedBy: req.body.resolverId || 'admin',
+        notes,
+      },
+    });
+    res.json(event);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to resolve emergency', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/config — get all system config
+router.get('/config', async (_req, res) => {
+  try {
+    const configs = await prisma.systemConfig.findMany({ orderBy: { key: 'asc' } });
+    res.json({ configs });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get config', message: err.message });
+  }
+});
+
+// PATCH /api/v1/admin/config/:key — update a config value
+router.patch('/config/:key', async (req, res) => {
+  try {
+    const { value } = req.body;
+    const config = await prisma.systemConfig.upsert({
+      where: { key: req.params.key },
+      update: { value },
+      create: { key: req.params.key, value },
+    });
+    res.json(config);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to update config', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/audit-log — list audit logs
+router.get('/audit-log', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = 20;
+
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          admin: { select: { phoneNumber: true, email: true } },
+        },
+      }),
+      prisma.auditLog.count(),
+    ]);
+
+    res.json({ logs, total, page, pages: Math.ceil(total / limit) });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get audit log', message: err.message });
   }
 });
 

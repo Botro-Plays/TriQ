@@ -20,6 +20,11 @@ import AdminKycQueue from './pages/admin/KycQueue';
 import AdminDrivers from './pages/admin/Drivers';
 import AdminRides from './pages/admin/Rides';
 import AdminReports from './pages/admin/Reports';
+import AdminSubscriptions from './pages/admin/Subscriptions';
+import AdminTips from './pages/admin/Tips';
+import AdminPassengers from './pages/admin/Passengers';
+import AdminRatings from './pages/admin/Ratings';
+import AdminMore from './pages/admin/More';
 
 function App() {
   return (
@@ -131,6 +136,46 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['OWNER', 'STAFF']}>
                 <AdminReports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/subscriptions"
+            element={
+              <ProtectedRoute allowedRoles={['OWNER', 'STAFF']}>
+                <AdminSubscriptions />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/tips"
+            element={
+              <ProtectedRoute allowedRoles={['OWNER', 'STAFF']}>
+                <AdminTips />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/passengers"
+            element={
+              <ProtectedRoute allowedRoles={['OWNER', 'STAFF']}>
+                <AdminPassengers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/ratings"
+            element={
+              <ProtectedRoute allowedRoles={['OWNER', 'STAFF']}>
+                <AdminRatings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/more"
+            element={
+              <ProtectedRoute allowedRoles={['OWNER', 'STAFF']}>
+                <AdminMore />
               </ProtectedRoute>
             }
           />

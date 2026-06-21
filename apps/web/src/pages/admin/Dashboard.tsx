@@ -11,7 +11,11 @@ interface Stats {
   completedRides: number;
   pendingKyc: number;
   suspendedDrivers: number;
-  totalEarnings: number;
+  subscriptionRevenue: number;
+  tipRevenue: number;
+  totalPlatformRevenue: number;
+  activeSubscriptions: number;
+  proSubscriptions: number;
 }
 
 export default function AdminDashboard() {
@@ -59,11 +63,25 @@ export default function AdminDashboard() {
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-triq-yellow">Dashboard</h1>
 
-      {/* Earnings banner */}
-      <div className="bg-gradient-to-r from-triq-slate to-triq-dark rounded-xl border border-triq-yellow/20 p-5">
-        <p className="text-xs text-gray-400 uppercase tracking-wider">Total Platform Earnings</p>
-        <p className="text-3xl font-bold text-triq-yellow mt-1">{formatPeso(stats.totalEarnings)}</p>
-        <p className="text-xs text-gray-500 mt-1">{stats.completedRides} completed rides</p>
+      {/* Platform revenue breakdown */}
+      <div className="bg-gradient-to-r from-triq-slate to-triq-dark rounded-xl border border-triq-yellow/20 p-5 space-y-3">
+        <p className="text-xs text-gray-400 uppercase tracking-wider">Platform Revenue</p>
+        <p className="text-3xl font-bold text-triq-yellow">{formatPeso(stats.totalPlatformRevenue)}</p>
+        <div className="flex gap-4 text-sm">
+          <div>
+            <span className="text-gray-400">Subscriptions: </span>
+            <span className="text-green-400 font-semibold">{formatPeso(stats.subscriptionRevenue)}</span>
+          </div>
+          <div>
+            <span className="text-gray-400">Tips: </span>
+            <span className="text-triq-cyan font-semibold">{formatPeso(stats.tipRevenue)}</span>
+          </div>
+        </div>
+        <div className="flex gap-4 text-xs text-gray-500 pt-1 border-t border-triq-light/10">
+          <span>Active Subs: <span className="text-white font-bold">{stats.activeSubscriptions}</span></span>
+          <span>Pro: <span className="text-white font-bold">{stats.proSubscriptions}</span></span>
+          <span>Completed Rides: <span className="text-white font-bold">{stats.completedRides}</span></span>
+        </div>
       </div>
 
       {/* Stats grid */}

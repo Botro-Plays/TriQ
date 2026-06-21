@@ -67,11 +67,16 @@ router.get('/:id/rides', async (req, res) => {
         status: true,
         pickupAddress: true,
         dropoffAddress: true,
+        pickupLat: true,
+        pickupLng: true,
+        dropoffLat: true,
+        dropoffLng: true,
         estimatedFare: true,
         finalFare: true,
         createdAt: true,
         completedAt: true,
-        driver: { select: { name: true, plateNumber: true } },
+        driver: { select: { id: true, name: true, plateNumber: true } },
+        review: { select: { id: true, rating: true, thumbsUp: true, comment: true } },
       },
     });
     res.json({ rides, page });

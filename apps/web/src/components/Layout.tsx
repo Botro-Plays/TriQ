@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/authStore';
 import {
   Home, Map, User, DollarSign, LayoutDashboard, ShieldCheck,
   Car, FlagTriangleRight, LogOut, Menu, X, History,
+  CreditCard, Heart, Users, Star, MoreHorizontal,
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -32,14 +33,24 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'KYC', path: '/admin/kyc', icon: ShieldCheck },
     { label: 'Drivers', path: '/admin/drivers', icon: Car },
     { label: 'Rides', path: '/admin/rides', icon: Map },
+    { label: 'Passengers', path: '/admin/passengers', icon: Users },
+    { label: 'Subs', path: '/admin/subscriptions', icon: CreditCard },
+    { label: 'Tips', path: '/admin/tips', icon: Heart },
+    { label: 'Ratings', path: '/admin/ratings', icon: Star },
     { label: 'Reports', path: '/admin/reports', icon: FlagTriangleRight },
+    { label: 'More', path: '/admin/more', icon: MoreHorizontal },
   ],
   STAFF: [
     { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { label: 'KYC', path: '/admin/kyc', icon: ShieldCheck },
     { label: 'Drivers', path: '/admin/drivers', icon: Car },
     { label: 'Rides', path: '/admin/rides', icon: Map },
+    { label: 'Passengers', path: '/admin/passengers', icon: Users },
+    { label: 'Subs', path: '/admin/subscriptions', icon: CreditCard },
+    { label: 'Tips', path: '/admin/tips', icon: Heart },
+    { label: 'Ratings', path: '/admin/ratings', icon: Star },
     { label: 'Reports', path: '/admin/reports', icon: FlagTriangleRight },
+    { label: 'More', path: '/admin/more', icon: MoreHorizontal },
   ],
 };
 
@@ -191,7 +202,7 @@ export default function Layout() {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto pb-20 sm:pb-4">
-        <div className="max-w-2xl mx-auto px-4 py-4 sm:py-6 animate-fade-in">
+        <div className={`mx-auto px-4 py-4 sm:py-6 animate-fade-in ${isAdmin ? 'max-w-4xl' : 'max-w-2xl'}`}>
           <Outlet />
         </div>
       </main>
@@ -226,7 +237,7 @@ export default function Layout() {
       {isAdmin && (
         <nav className="fixed bottom-0 left-0 right-0 z-30 bg-triq-slate/95 backdrop-blur-md border-t border-triq-light/20 shadow-bottom-nav safe-bottom md:hidden">
           <div className="flex items-center justify-around h-16 max-w-mobile mx-auto overflow-x-auto">
-            {items.slice(0, 5).map((item) => {
+            {items.slice(0, 6).map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
               return (

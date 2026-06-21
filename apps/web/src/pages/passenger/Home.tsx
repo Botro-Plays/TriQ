@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
@@ -55,6 +56,7 @@ interface ActiveRide {
 
 export default function PassengerHome() {
   const { user } = useAuthStore();
+  const location = useLocation();
   const [step, setStep] = useState<'idle' | 'searching' | 'active'>('idle');
   const [pickup, setPickup] = useState<{ lat: number; lng: number; address: string } | null>(null);
   const [dropoff, setDropoff] = useState<{ lat: number; lng: number; address: string } | null>(null);
@@ -86,6 +88,17 @@ export default function PassengerHome() {
       .then((res) => setPassengerId(res.data.id))
       .catch(() => {});
   }, [user]);
+
+  // Handle re-book navigation from History page
+  useEffect(() => {
+    const state = location.state as { pickup?: { lat: number; lng: number; address: string }; dropoff?: { lat: number; lng: number; address: string } } | null;
+    if (state?.pickup && state?.dropoff) {
+      setPickup(state.pickup);
+      setDropoff(state.dropoff);
+      setDropoffQuery(state.dropoff.address);
+      setStep('searching');
+    }
+  }, [location.state]);
 
   // Track step in ref so polling interval doesn't get cleared on step changes
   const stepRef = useRef(step);
@@ -938,7 +951,7 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
 
       {/* Action buttons */}
       <div className="flex gap-2">
-        {!['COMPLETED', 'CANCELLED'].includes(ride.status) && (
+        {['ACCEPTED', 'COUNTER_OFFER_ACCEPTED', 'ARRIVING', 'IN_PROGRESS'].includes(ride.status) && (
           <>
             <button
               onPointerDown={startEmergencyHold}
@@ -974,7 +987,7 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
             <ThumbsUp size={14} /> Thanks for rating!
           </div>
         )}
-        {!['CANCELLED'].includes(ride.status) && (
+        {ride.driver && !['CANCELLED'].includes(ride.status) && (
           <button
             onClick={() => setShowReport(true)}
             className="h-10 px-3 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/30 text-xs font-medium"
