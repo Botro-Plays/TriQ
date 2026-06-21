@@ -105,6 +105,7 @@ model Passenger {
   kycRejectionReason String?
   trustScore    Int      @default(100)
   autoCancelledCount Int  @default(0)
+  fcmToken      String?  // Firebase Cloud Messaging push token
 
   user          User     @relation(fields: [userId], references: [id])
   rides         Ride[]   @relation("PassengerRides")
@@ -150,6 +151,7 @@ model Driver {
   subscriptionTier  SubscriptionTier @default(FREE)
   subscriptionStatus SubscriptionStatus @default(ACTIVE)
   subscriptionExpiresAt DateTime?
+  fcmToken          String?  // Firebase Cloud Messaging push token
 
   user              User          @relation(fields: [userId], references: [id])
   rides             Ride[]        @relation("DriverRides")

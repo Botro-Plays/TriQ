@@ -19,12 +19,22 @@ type NearbyDriver = {
   name: string;
   plateNumber: string;
   tricycleModel: string | null;
+  photoUrl: string | null;
   rating: number;
   totalRides: number;
   currentLat: number | null;
   currentLng: number | null;
   pickupRadius: number;
+  subscriptionTier: string;
+  subscriptionStatus: string;
 };
+
+function tierWeight(tier: string, status: string): number {
+  if (status !== 'ACTIVE') return 0;
+  if (tier === 'ELITE') return 3;
+  if (tier === 'PRO') return 2;
+  return 0; // FREE
+}
 
 // GET /api/v1/drivers?userId=xxx — get driver by user ID
 router.get('/', async (req, res) => {
@@ -72,11 +82,14 @@ router.get('/nearby', async (req, res) => {
         name: true,
         plateNumber: true,
         tricycleModel: true,
+        photoUrl: true,
         rating: true,
         totalRides: true,
         currentLat: true,
         currentLng: true,
         pickupRadius: true,
+        subscriptionTier: true,
+        subscriptionStatus: true,
       },
     });
 
@@ -84,13 +97,20 @@ router.get('/nearby', async (req, res) => {
       .filter((d: NearbyDriver) => {
         if (d.currentLat == null || d.currentLng == null) return false;
         const dist = haversine(lat, lng, d.currentLat, d.currentLng);
-        return dist <= Math.max(radiusKm, d.pickupRadius);
+        // ELITE drivers get 1.2x pickup radius bonus — wider visibility
+        const effectivePickupRadius =
+          (d.subscriptionTier === 'ELITE' && d.subscriptionStatus === 'ACTIVE')
+            ? d.pickupRadius * 1.2
+            : d.pickupRadius;
+        return dist <= Math.max(radiusKm, effectivePickupRadius);
       })
       .map((d: NearbyDriver) => ({
         ...d,
         distance: haversine(lat, lng, d.currentLat!, d.currentLng!),
+        tierWeight: tierWeight(d.subscriptionTier, d.subscriptionStatus),
       }))
-      .sort((a: NearbyDriver & { distance: number }, b: NearbyDriver & { distance: number }) => a.distance - b.distance);
+      // Sort: ELITE first → PRO → FREE, then by distance within each tier
+      .sort((a, b) => b.tierWeight - a.tierWeight || a.distance - b.distance);
 
     res.json({ drivers: nearby });
   } catch (err: any) {
@@ -420,6 +440,18 @@ router.post('/:id/report-passenger', async (req, res) => {
     res.status(201).json(report);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to create report', message: err.message });
+  }
+});
+
+// PATCH /api/v1/drivers/:id/fcm-token — save FCM push token
+router.patch('/:id/fcm-token', async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+    if (!fcmToken) { res.status(400).json({ error: 'fcmToken is required' }); return; }
+    await prisma.driver.update({ where: { id: req.params.id }, data: { fcmToken } as any });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to save FCM token', message: err.message });
   }
 });
 

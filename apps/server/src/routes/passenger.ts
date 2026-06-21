@@ -212,4 +212,16 @@ router.get('/:id/points', async (req, res) => {
   }
 });
 
+// PATCH /api/v1/passengers/:id/fcm-token \u2014 save FCM push token
+router.patch('/:id/fcm-token', async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+    if (!fcmToken) { res.status(400).json({ error: 'fcmToken is required' }); return; }
+    await prisma.passenger.update({ where: { id: req.params.id }, data: { fcmToken } as any });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to save FCM token', message: err.message });
+  }
+});
+
 export default router;

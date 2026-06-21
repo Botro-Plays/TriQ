@@ -781,12 +781,12 @@ router.put('/paymongo', async (req, res) => {
     if (publicKey) updates.push({ key: 'PAYMONGO_PUBLIC_KEY', value: publicKey, description: 'PayMongo Public API Key' });
     if (webhookSecret) updates.push({ key: 'PAYMONGO_WEBHOOK_SECRET', value: webhookSecret, description: 'PayMongo Webhook Signing Secret' });
     if (proSubscriptionPrice !== undefined) {
-      const priceCentavos = Math.max(10000, Math.round(parseFloat(proSubscriptionPrice) * 100));
+      const priceCentavos = Math.max(5000, Math.round(parseFloat(proSubscriptionPrice) * 100)); // min ₱50
       updates.push({ key: 'PAYMONGO_PRO_PRICE', value: String(priceCentavos), description: 'TriQ Pro subscription price in centavos' });
     }
     const { eliteSubscriptionPrice } = req.body;
     if (eliteSubscriptionPrice !== undefined) {
-      const priceCentavos = Math.max(10000, Math.round(parseFloat(eliteSubscriptionPrice) * 100));
+      const priceCentavos = Math.max(9900, Math.round(parseFloat(eliteSubscriptionPrice) * 100)); // min ₱99
       updates.push({ key: 'PAYMONGO_ELITE_PRICE', value: String(priceCentavos), description: 'TriQ Elite subscription price in centavos' });
     }
 

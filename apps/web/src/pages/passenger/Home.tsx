@@ -33,6 +33,8 @@ interface NearbyDriver {
   currentLat: number;
   currentLng: number;
   distance: number;
+  subscriptionTier: string;
+  subscriptionStatus: string;
 }
 
 interface ActiveRide {
@@ -647,12 +649,23 @@ export default function PassengerHome() {
             <div className="card p-3">
               <p className="text-xs text-gray-400 mb-2">Nearby drivers</p>
               <div className="space-y-1.5">
-                {nearbyDrivers.slice(0, 3).map((d) => (
-                  <div key={d.id} className="flex items-center justify-between text-sm">
-                    <span className="text-white truncate">{d.name}</span>
-                    <span className="text-gray-400 shrink-0 ml-2">{d.distance.toFixed(1)}km · ⭐{d.rating.toFixed(1)}</span>
-                  </div>
-                ))}
+                {nearbyDrivers.slice(0, 5).map((d) => {
+                  const isElite = d.subscriptionTier === 'ELITE' && d.subscriptionStatus === 'ACTIVE';
+                  const isPro = d.subscriptionTier === 'PRO' && d.subscriptionStatus === 'ACTIVE';
+                  return (
+                    <div key={d.id} className={`flex items-center justify-between text-sm px-2 py-1 rounded-lg ${
+                      isElite ? 'bg-triq-yellow/5 border border-triq-yellow/20' :
+                      isPro ? 'bg-triq-cyan/5 border border-triq-cyan/10' : ''
+                    }`}>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-white truncate">{d.name}</span>
+                        {isElite && <span className="shrink-0 text-[9px] font-bold px-1 py-0.5 rounded bg-triq-yellow/20 text-triq-yellow uppercase tracking-wide">Elite</span>}
+                        {isPro && !isElite && <span className="shrink-0 text-[9px] font-bold px-1 py-0.5 rounded bg-triq-cyan/20 text-triq-cyan uppercase tracking-wide">Pro</span>}
+                      </div>
+                      <span className="text-gray-400 shrink-0 ml-2">{d.distance.toFixed(1)}km · ⭐{d.rating.toFixed(1)}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

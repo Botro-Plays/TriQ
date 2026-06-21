@@ -7,6 +7,9 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useFCM } from '../hooks/useFCM';
+
+function FCMRegistrar() { useFCM(); return null; }
 
 type UserRole = 'PASSENGER' | 'DRIVER' | 'OWNER' | 'STAFF';
 
@@ -100,6 +103,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-triq-dark flex flex-col">
+      <FCMRegistrar />
       {/* Top header — compact, mobile-friendly */}
       <header className="sticky top-0 z-30 bg-triq-dark/95 backdrop-blur-md border-b border-triq-light/10 safe-top">
         <div className="flex items-center justify-between h-14 px-4 max-w-7xl mx-auto">

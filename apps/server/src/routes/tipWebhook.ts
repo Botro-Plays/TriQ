@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/db';
+import { sendPush } from '../lib/fcm';
 import crypto from 'crypto';
 
 const router = Router();
@@ -82,6 +83,17 @@ router.post('/', async (req, res) => {
         if (status === 'paid' && tip.status !== 'PAID') {
           await prisma.tip.update({ where: { id: tip.id }, data: { status: 'PAID', paidAt: new Date() } });
           console.log('[tipWebhook] Tip', tip.id, 'marked PAID');
+          // Push: notify passenger their tip went through
+          if (tip.passengerId) {
+            const p = await prisma.passenger.findUnique({ where: { id: tip.passengerId }, select: { fcmToken: true } as any }) as any;
+            if (p?.fcmToken) {
+              await sendPush(p.fcmToken, {
+                title: '❤️ Tip Sent!',
+                body: `Your ₱${(tip.amount / 100).toFixed(0)} tip to TriQ was received. Thank you!`,
+                data: { type: 'TIP_PAID', tipId: tip.id },
+              });
+            }
+          }
         }
         res.json({ received: true, type: 'tip', tipId: tip.id });
         return;
@@ -97,6 +109,16 @@ router.post('/', async (req, res) => {
             data: { subscriptionTier: subscription.tier, subscriptionStatus: 'ACTIVE', subscriptionExpiresAt: subscription.expiresAt },
           });
           console.log('[tipWebhook] Subscription', subscription.id, 'activated for driver', subscription.driverId);
+          // Push: notify driver their subscription is active
+          const drv = await prisma.driver.findUnique({ where: { id: subscription.driverId }, select: { fcmToken: true } as any }) as any;
+          if (drv?.fcmToken) {
+            const tierLabel = (subscription.tier as string) === 'ELITE' ? 'Elite' : 'Pro';
+            await sendPush(drv.fcmToken, {
+              title: `👑 TriQ ${tierLabel} Activated!`,
+              body: `Your ${tierLabel} subscription is now active. Enjoy your perks!`,
+              data: { type: 'SUBSCRIPTION_ACTIVATED', subscriptionId: subscription.id },
+            });
+          }
         }
         res.json({ received: true, type: 'subscription', subscriptionId: subscription.id });
         return;

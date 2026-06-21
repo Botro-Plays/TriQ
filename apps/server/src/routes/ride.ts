@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/db';
+import { sendPush } from '../lib/fcm';
 
 const router = Router();
 
@@ -161,6 +162,21 @@ router.post('/', async (req, res) => {
     });
 
     res.status(201).json(ride);
+
+    // Push notification: notify preferred driver on rebook, else skip (Socket.io handles broadcast)
+    if (preferredDriverId) {
+      const prefDriver = await prisma.driver.findUnique({
+        where: { id: preferredDriverId },
+        select: { fcmToken: true, name: true } as any,
+      }) as any;
+      if (prefDriver?.fcmToken) {
+        await sendPush(prefDriver.fcmToken, {
+          title: '🛺 Rebook Request!',
+          body: `${ride.passenger.name} is requesting you specifically. Tap to view.`,
+          data: { rideId: ride.id, type: 'REBOOK' },
+        });
+      }
+    }
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to create ride', message: err.message });
   }
@@ -371,6 +387,19 @@ router.post('/:id/accept', async (req, res) => {
     await prisma.rideStatus.create({
       data: { rideId: ride.id, status: 'ACCEPTED', actor: 'DRIVER' },
     });
+
+    // Push notification: tell passenger their ride was accepted
+    const passenger = await prisma.passenger.findUnique({
+      where: { id: updated.passenger.id },
+      select: { fcmToken: true } as any,
+    }) as any;
+    if (passenger?.fcmToken) {
+      await sendPush(passenger.fcmToken, {
+        title: '🎉 Driver Accepted!',
+        body: `${updated.driver?.name} (${updated.driver?.plateNumber}) is on the way.`,
+        data: { rideId: ride.id, type: 'ACCEPTED' },
+      });
+    }
 
     res.json(updated);
   } catch (err: any) {

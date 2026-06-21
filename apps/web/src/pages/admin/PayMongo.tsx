@@ -212,7 +212,7 @@ export default function AdminPayMongo() {
           </div>
           <p className="text-[10px] text-gray-500">
             Current price: <span className="text-white font-medium">₱{config ? (config.proSubscriptionPrice / 100).toFixed(2) : '50.00'}/month</span>
-            {' '}· Minimum ₱100. Leave blank to keep current.
+            {' '}· Minimum ₱50. Leave blank to keep current.
           </p>
         </div>
 
@@ -235,7 +235,7 @@ export default function AdminPayMongo() {
           </div>
           <p className="text-[10px] text-gray-500">
             Current price: <span className="text-white font-medium">₱{config ? (config.eliteSubscriptionPrice / 100).toFixed(2) : '99.00'}/month</span>
-            {' '}· Minimum ₱100. Leave blank to keep current.
+            {' '}· Minimum ₱99. Leave blank to keep current.
           </p>
         </div>
 
