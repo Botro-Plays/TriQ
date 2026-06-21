@@ -221,8 +221,10 @@
 | Admin Passengers | ✅ | `src/pages/admin/Passengers.tsx` | Passenger list with suspend/reinstate |
 | Admin Ratings | ✅ | `src/pages/admin/Ratings.tsx` | Ratings list with filter |
 | Admin PayMongo Settings | ✅ | `src/pages/admin/PayMongo.tsx` | API key configuration, webhook URL, PRO & ELITE subscription price fields (₱/month, admin-configurable) |
-| Passenger Home | ✅ | `src/pages/passenger/Home.tsx` | Nearby driver list shows PRO (cyan badge) and ELITE (yellow badge) with tier-based highlight cards; up to 5 shown |
+| Passenger Home | ✅ | `src/pages/passenger/Home.tsx` | Nearby driver list shows PRO (cyan badge) and ELITE (yellow badge) with tier-based highlight cards; up to 5 shown; driver names masked (`First L.` format) |
 | Push Notifications (FCM) | ✅ | `src/hooks/useFCM.ts` + `public/firebase-messaging-sw.js` | Requests permission, gets token, saves to server. Background push via SW, foreground via Notification API. Requires `VITE_FIREBASE_VAPID_KEY`. |
+| Name Privacy | ✅ | `src/lib/maskName.ts` | `maskName()` utility masks names to `First L.` format. Applied in leaderboards + nearby drivers. Admin routes show full names. |
+| Automated Ride Reminders | ✅ | `src/lib/rideCron.ts` | Cron job (every 5 min via `node-cron`): pending not accepted after 10 min → passenger, accepted not started after 45 min → both, in-progress > 2 hrs → both. |
 
 ### 2.3 Components
 | Feature | Status | File | Notes |
@@ -275,7 +277,7 @@ Users can:
 
 - **Monetization**: Driver subscriptions (FREE/PRO/ELITE) + passenger tips — platform never handles ride fares (cash-only, direct passenger→driver). Subscription prices are admin-configurable via `/admin` → PayMongo Settings, stored in `SystemConfig` (`PAYMONGO_PRO_PRICE`, `PAYMONGO_ELITE_PRICE`), take effect immediately without redeploy
 - **Rebook as subscription perk**: Only available if original driver has ACTIVE PRO or ELITE subscription; ride request visible only to the preferred driver
-- **Leaderboards**: Computed via aggregation queries (no pre-computed rank column), supports week/month/alltime periods. Both drivers and passengers can see both leaderboards via Drivers/Passengers toggle. Passenger "ratings" metric uses driver thumbs-up approval rate.
+- **Leaderboards**: Computed via aggregation queries (no pre-computed rank column), supports week/month/alltime periods. Both drivers and passengers can see both leaderboards via Drivers/Passengers toggle. Passenger "ratings" metric uses driver thumbs-up approval rate. All names masked via `maskName()` for privacy.
 - **Driver→Passenger feedback**: After completing a ride, drivers can give thumbs up/down to the passenger. One feedback per ride. Used for passenger leaderboard approval rate metric.
 - **Subscription tiers**: FREE, PRO (₱50/mo default), and ELITE (₱99/mo default) — both paid tiers admin-configurable via SystemConfig
 - **Admin earnings**: Shows subscription revenue + tip revenue (not ride fares, which are driver cash earnings)
@@ -283,6 +285,8 @@ Users can:
 - **Auth middleware**: JWT verification on all API routes except /auth and /health. Admin routes require OWNER or STAFF role.
 - **Socket.io**: JWT-authenticated, room-based (user:userId). Real-time events for ride requests, cancellations, counter-offers, and driver location broadcasting. Rebook rides only sent to preferred driver.
 - **PayMongo integration**: Tips and subscriptions (PRO/ELITE) use PayMongo checkout (GCash/Maya/Card/QRPH). Webhook endpoint is public (no auth), uses `express.raw` for raw body capture, HMAC-SHA256 signature verification over `timestamp.rawBody`. Payment matching via `payment_intent_id` stored as `paymongoId` on Tip/Subscription records. Falls back to dev mode (PENDING/ACTIVE without payment) when `PAYMONGO_SECRET_KEY` not configured. Admin can configure API keys, webhook secret, and subscription prices via `/admin` → PayMongo Settings.
-- **FCM Push Notifications**: Firebase Cloud Messaging via `firebase-admin` (server) + `firebase/messaging` (client). Token saved per driver/passenger. Events: rebook request → driver, ride accepted → passenger, subscription activated → driver, tip paid → passenger. Background handled by `/firebase-messaging-sw.js` service worker. Requires `VITE_FIREBASE_VAPID_KEY` (generate in Firebase Console → Project Settings → Cloud Messaging → Web Push Certificates).
-- **Nearby sort**: ELITE → PRO → FREE (by tier weight), then by distance within each tier. ELITE gets 1.2× effective pickup radius (wider visibility).
+- **FCM Push Notifications**: Firebase Cloud Messaging via `firebase-admin` (server) + `firebase/messaging` (client). Token saved per driver/passenger. Events: rebook request → driver, ride accepted → passenger, driver arriving → passenger, ride started → passenger, ride completed → passenger, counter-offer received → passenger, counter-offer accepted/rejected → driver, ride cancelled → both parties, subscription activated → driver, tip paid → passenger. Background handled by `/firebase-messaging-sw.js` service worker. Requires `VITE_FIREBASE_VAPID_KEY` (generate in Firebase Console → Project Settings → Cloud Messaging → Web Push Certificates).
+- **Nearby sort**: ELITE → PRO → FREE (by tier weight), then by distance within each tier. ELITE gets 1.2× effective pickup radius (wider visibility). Driver names masked (`First L.` format) in nearby response for privacy.
+- **Name privacy**: `maskName()` utility (`src/lib/maskName.ts`) applied to all public-facing name fields — leaderboards (drivers + passengers), nearby driver list. Admin routes still show full names for KYC/management.
+- **Automated ride reminders**: Cron job (`src/lib/rideCron.ts`, every 5 min via `node-cron`) sends push notifications for stale rides: REQUESTED not accepted after 10 min → passenger, ACCEPTED/ARRIVING not started after 45 min → both, IN_PROGRESS > 2 hours → both. Sliding 5-min window prevents duplicate notifications.
 - **Gamification**: Badges, points, and seasonal challenges endpoints implemented. Points award endpoint for internal use by ride completion/rating flows.

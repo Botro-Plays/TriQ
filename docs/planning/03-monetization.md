@@ -83,6 +83,13 @@ Driver signs up ──► Free Pro Trial (7 days, tracked in Subscription as `is
 - **No Escrow**: All ride fares are cash-only, paid directly by passenger to driver. Platform never holds ride money.
 - **Dev mode**: When `PAYMONGO_SECRET_KEY` not configured, subscriptions activate immediately without payment (for development/testing)
 
+### Push Notifications on Payment Events
+- **Subscription activated**: Driver receives FCM push ("👑 TriQ Pro/Elite Activated!") when PayMongo webhook confirms payment
+- **Tip paid**: Passenger receives FCM push ("❤️ Tip Sent!") when PayMongo webhook confirms tip payment
+
+### Privacy
+- **Name masking**: All public-facing name fields (leaderboards, nearby driver list) use `maskName()` to show `First L.` format instead of full names. Admin routes retain full names for KYC and management purposes.
+
 ---
 
 ## 2. Passenger Tipping (Optional Platform Support)

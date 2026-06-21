@@ -539,9 +539,11 @@ Public-facing marketing site served at root domain.
 - In-app reporting & disputes
 - Saved places for passengers
 - Earnings analytics for drivers
+- Push notifications (FCM) — ride events, counter-offers, subscription activation, tip paid
+- Name privacy masking on leaderboards and nearby driver list
+- Automated stale ride reminder cron (pending not accepted, accepted not started, long in-progress)
 
 **Phase 3 (Future):**
-- Push notifications (FCM)
 - Route optimization with OSRM
 - Surge / peak pricing
 - In-app chat passenger ↔ driver
