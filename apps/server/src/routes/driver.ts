@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/db';
+import { maskName } from '../lib/maskName';
 
 const router = Router();
 
@@ -106,6 +107,7 @@ router.get('/nearby', async (req, res) => {
       })
       .map((d: NearbyDriver) => ({
         ...d,
+        name: maskName(d.name),
         distance: haversine(lat, lng, d.currentLat!, d.currentLng!),
         tierWeight: tierWeight(d.subscriptionTier, d.subscriptionStatus),
       }))

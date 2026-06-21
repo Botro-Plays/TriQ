@@ -29,6 +29,7 @@ import { requestLogger } from './middleware/requestLogger';
 import { authMiddleware, requireRole } from './middleware/auth';
 import { logger } from './lib/logger';
 import { seedDatabase } from './lib/seed';
+import { startRideCron } from './lib/rideCron';
 
 // Routes
 import authRoutes from './routes/auth';
@@ -129,6 +130,8 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
     console.error('[TriQ Server] ❌ Seed failed:', err);
     // Continue starting server — don't block startup on seed errors
   }
+
+  startRideCron();
 
   httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`[TriQ Server] 🛺 Server running on 0.0.0.0:${PORT}`);

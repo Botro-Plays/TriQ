@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/db';
+import { maskName } from '../lib/maskName';
 
 const router = Router();
 
@@ -39,7 +40,7 @@ router.get('/drivers', async (req, res) => {
         },
       });
       const total = await prisma.driver.count({ where: { reviewCount: { gte: 1 }, status: { not: 'SUSPENDED' } } });
-      res.json({ entries: drivers.map((d, i) => ({ ...d, rank: (page - 1) * limit + i + 1, score: d.rating })), total, page, pages: Math.ceil(total / limit) });
+      res.json({ entries: drivers.map((d, i) => ({ ...d, name: maskName(d.name), rank: (page - 1) * limit + i + 1, score: d.rating })), total, page, pages: Math.ceil(total / limit) });
       return;
     }
 
@@ -71,11 +72,10 @@ router.get('/drivers', async (req, res) => {
       });
 
       res.json({
-        entries: results.map((r, i) => ({
-          ...driverMap.get(r.driverId!),
-          rank: (page - 1) * limit + i + 1,
-          score: r._count.id,
-        })).filter((e) => e.id),
+        entries: results.map((r, i) => {
+          const d = driverMap.get(r.driverId!);
+          return d ? { ...d, name: maskName(d.name), rank: (page - 1) * limit + i + 1, score: r._count.id } : null;
+        }).filter(Boolean),
         total: total.length,
         page,
         pages: Math.ceil(total.length / limit),
@@ -104,11 +104,10 @@ router.get('/drivers', async (req, res) => {
       });
 
       res.json({
-        entries: results.map((r, i) => ({
-          ...driverMap.get(r.driverId!),
-          rank: (page - 1) * limit + i + 1,
-          score: r._sum.finalFare || 0,
-        })).filter((e) => e.id),
+        entries: results.map((r, i) => {
+          const d = driverMap.get(r.driverId!);
+          return d ? { ...d, name: maskName(d.name), rank: (page - 1) * limit + i + 1, score: r._sum.finalFare || 0 } : null;
+        }).filter(Boolean),
         total: total.length,
         page,
         pages: Math.ceil(total.length / limit),
@@ -167,11 +166,10 @@ router.get('/passengers', async (req, res) => {
       });
 
       res.json({
-        entries: results.map((r, i) => ({
-          ...passengerMap.get(r.passengerId),
-          rank: (page - 1) * limit + i + 1,
-          score: r._count.id,
-        })).filter((e) => e.id),
+        entries: results.map((r, i) => {
+          const p = passengerMap.get(r.passengerId);
+          return p ? { ...p, name: maskName(p.name), rank: (page - 1) * limit + i + 1, score: r._count.id } : null;
+        }).filter(Boolean),
         total: total.length,
         page,
         pages: Math.ceil(total.length / limit),
@@ -204,12 +202,10 @@ router.get('/passengers', async (req, res) => {
       });
 
       res.json({
-        entries: results.map((r, i) => ({
-          ...(r.passengerId ? passengerMap.get(r.passengerId) : undefined),
-          rank: (page - 1) * limit + i + 1,
-          score: r._sum.amount || 0,
-          tipCount: r._count.id,
-        })).filter((e) => e?.id),
+        entries: results.map((r, i) => {
+          const p = r.passengerId ? passengerMap.get(r.passengerId) : undefined;
+          return p ? { ...p, name: maskName(p.name), rank: (page - 1) * limit + i + 1, score: r._sum.amount || 0, tipCount: r._count.id } : null;
+        }).filter(Boolean),
         total: total.length,
         page,
         pages: Math.ceil(total.length / limit),
@@ -254,13 +250,10 @@ router.get('/passengers', async (req, res) => {
       const passengerMap = new Map(passengers.map((p) => [p.id, p]));
 
       res.json({
-        entries: pageResults.map((r, i) => ({
-          ...passengerMap.get(r.toPassengerId),
-          rank: (page - 1) * limit + i + 1,
-          score: r.approvalRate,
-          feedbackCount: r.total,
-          thumbsUpCount: r.thumbsUp,
-        })).filter((e) => e.id),
+        entries: pageResults.map((r, i) => {
+          const p = passengerMap.get(r.toPassengerId);
+          return p ? { ...p, name: maskName(p.name), rank: (page - 1) * limit + i + 1, score: r.approvalRate, feedbackCount: r.total, thumbsUpCount: r.thumbsUp } : null;
+        }).filter(Boolean),
         total: merged.length,
         page,
         pages: Math.ceil(merged.length / limit),
