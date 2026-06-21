@@ -3,7 +3,76 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-triq-cloud text-triq-slate antialiased;
+  * {
+    -webkit-tap-highlight-color: transparent;
   }
+
+  body {
+    @apply bg-triq-dark text-gray-100 antialiased;
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Safe area padding for notched devices */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-triq-slate rounded-xl border border-triq-light/20 shadow-card;
+  }
+  .card-elevated {
+    @apply bg-triq-slate-elevated rounded-xl border border-triq-light/20 shadow-card;
+  }
+  .input-base {
+    @apply w-full h-11 px-3.5 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm
+      placeholder-gray-500 focus:border-triq-cyan focus:ring-2 focus:ring-triq-cyan/20 focus:outline-none transition-all;
+  }
+  .btn-primary {
+    @apply h-12 rounded-xl bg-triq-yellow text-triq-dark font-bold text-base
+      active:scale-[0.97] transition-transform hover:shadow-neon-yellow
+      disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply h-11 rounded-lg bg-triq-light/10 text-gray-200 font-medium text-sm
+      active:scale-[0.97] transition-transform border border-triq-light/20
+      hover:bg-triq-light/20 disabled:opacity-40;
+  }
+  .btn-danger {
+    @apply h-11 rounded-lg border border-red-500/30 text-red-400 text-sm font-medium
+      hover:bg-red-500/10 active:scale-[0.97] transition-all;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.5);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(51, 65, 85, 0.8);
+}
+
+/* Leaflet map dark theme tweaks */
+.leaflet-container {
+  background: #0B1120;
+}
+.leaflet-tile {
+  filter: brightness(0.85) contrast(1.1) saturate(0.8);
+}
+.triq-marker {
+  background: transparent !important;
+  border: none !important;
 }

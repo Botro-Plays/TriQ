@@ -4,14 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import { auth, RecaptchaVerifier } from '../lib/firebase';
 import { signInWithPhoneNumber, ConfirmationResult, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { api } from '../lib/api';
+import { User, Car, Shield, Crown } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 type UserRole = 'PASSENGER' | 'DRIVER' | 'OWNER' | 'STAFF';
 
-const ROLES: { label: string; value: UserRole; description: string; icon: string }[] = [
-  { label: 'Passenger', value: 'PASSENGER', description: 'Book tricycle rides', icon: 'M' },
-  { label: 'Driver', value: 'DRIVER', description: 'Accept ride requests & earn', icon: 'D' },
-  { label: 'Staff', value: 'STAFF', description: 'Admin dashboard access', icon: 'S' },
-  { label: 'Owner', value: 'OWNER', description: 'Full admin control', icon: 'O' },
+const ROLES: { label: string; value: UserRole; description: string; icon: LucideIcon }[] = [
+  { label: 'Passenger', value: 'PASSENGER', description: 'Book tricycle rides', icon: User },
+  { label: 'Driver', value: 'DRIVER', description: 'Accept ride requests & earn', icon: Car },
+  { label: 'Staff', value: 'STAFF', description: 'Admin dashboard access', icon: Shield },
+  { label: 'Owner', value: 'OWNER', description: 'Full admin control', icon: Crown },
 ];
 
 function TriQLogo({ className = '' }: { className?: string }) {
@@ -179,10 +181,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-triq-dark flex flex-col items-center justify-center px-5 py-8">
+    <div className="min-h-screen bg-triq-dark flex flex-col items-center justify-center px-5 py-8 safe-top safe-bottom">
       {/* Logo + Branding */}
       <div className="flex flex-col items-center mb-8">
-        <TriQLogo className="w-40 h-40 mb-4 animate-pulse" />
+        <TriQLogo className="w-36 h-36 mb-4 animate-pulse" />
+        <h1 className="text-3xl font-extrabold text-triq-yellow tracking-tight">TriQ</h1>
         <p className="text-gray-300 text-sm mt-2 text-center leading-relaxed">
           Tricycle Booking in Digos City<br />
           <span className="text-triq-cyan/70">Padulong na! Booking made easy.</span>
@@ -192,7 +195,7 @@ export default function Login() {
       <div id="recaptcha-container" />
 
       {/* Card Container */}
-      <div className={`w-full max-w-sm bg-triq-slate rounded-2xl border border-triq-light/20 shadow-neon-sm p-6 ${shakeError ? 'animate-shake' : ''}`}>
+      <div className={`w-full max-w-sm card p-6 ${shakeError ? 'animate-shake' : ''}`}>
 
         {step === 'phone' && (
           <div className="space-y-5">
@@ -345,7 +348,9 @@ export default function Login() {
             )}
 
             <div className="space-y-2.5">
-              {availableRoles.map((r) => (
+              {availableRoles.map((r) => {
+                const RoleIcon = r.icon;
+                return (
                 <button
                   key={r.value}
                   onClick={() => selectRole(r.value)}
@@ -356,9 +361,9 @@ export default function Login() {
                     active:scale-[0.98] transition-all
                     disabled:opacity-40 disabled:cursor-not-allowed text-left"
                 >
-                  <div className="w-10 h-10 rounded-full bg-triq-light/10 flex items-center justify-center text-triq-cyan font-bold text-sm shrink-0
+                  <div className="w-10 h-10 rounded-full bg-triq-light/10 flex items-center justify-center text-triq-cyan shrink-0
                     group-hover:bg-triq-cyan/20 transition-colors">
-                    {r.icon}
+                    <RoleIcon size={18} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-white font-semibold text-sm">{r.label}</div>
@@ -368,7 +373,8 @@ export default function Login() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
