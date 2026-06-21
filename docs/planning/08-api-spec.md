@@ -151,6 +151,8 @@ Response: 204 No Content
 | `POST` | `/rides/:id/complete` | Yes (Driver) | Complete ride |
 | `POST` | `/rides/:id/cancel` | Yes | Cancel ride (passenger or driver) |
 | `POST` | `/rides/:id/rate` | Yes (Passenger) | Rate driver |
+| `POST` | `/rides/:id/review` | Yes (Passenger) | Submit review (rating + thumbs up + comment) |
+| `POST` | `/rides/:id/passenger-feedback` | Yes (Driver) | Driver gives thumbs up/down to passenger |
 | `POST` | `/rides/:id/thumbs` | Yes | Thumbs up/down the other party |
 | `POST` | `/rides/:id/report` | Yes | Report the other party |
 | `POST` | `/rides/:id/tip` | Yes (Passenger) | Platform tip (₱1–₱20) |
@@ -198,7 +200,7 @@ Response:
 
 Query params:
 - `period` (string): `week` | `month` | `alltime`
-- `metric` (string): `rides` | `earnings` | `rating` (driver) / `rides` | `tips` | `ratings` (passenger)
+- `metric` (string): `rides` | `earnings` | `rating` (driver) / `rides` | `tips` | `ratings` (passenger — approval rate from driver feedback)
 - `page` (int, default=1)
 - `limit` (int, default=20, max=100)
 
@@ -216,6 +218,26 @@ Response:
       "rating": 4.8,
       "totalRides": 150,
       "subscriptionTier": "PRO"
+    }
+  ],
+  "total": 25,
+  "page": 1,
+  "pages": 2
+}
+```
+
+**Passenger leaderboard (ratings metric)** returns `score` as approval rate (0-100), `feedbackCount`, and `thumbsUpCount`:
+```json
+{
+  "entries": [
+    {
+      "id": "uuid",
+      "name": "Maria Santos",
+      "photoUrl": "...",
+      "rank": 1,
+      "score": 92,
+      "feedbackCount": 12,
+      "thumbsUpCount": 11
     }
   ],
   "total": 25,

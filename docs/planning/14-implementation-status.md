@@ -88,7 +88,8 @@
 | Reject counter-offer | ✅ | `POST /api/v1/rides/:id/counter-offer/reject` |
 | Emergency alert | ✅ | `POST /api/v1/rides/:id/emergency` — creates EmergencyEvent |
 | Submit review | ✅ | `POST /api/v1/rides/:id/review` — rating + thumbs up + comment, updates driver rating |
-| Rebook (subscription perk) | ✅ | `preferredDriverId` field on Ride — only drivers with ACTIVE subscription can be rebooked; ride only visible to preferred driver; only preferred driver can accept |
+| Driver→Passenger feedback | ✅ | `POST /api/v1/rides/:id/passenger-feedback` — driver gives thumbs up/down to passenger after completed ride |
+| Rebook (subscription perk) | ✅ | `preferredDriverId` field on Ride — only drivers with ACTIVE PRO subscription can be rebooked; ride only visible to preferred driver; only preferred driver can accept |
 
 ### 1.7 Admin Routes (`src/routes/admin.ts`)
 | Feature | Status | Notes |
@@ -121,7 +122,7 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Driver leaderboard | ✅ | `GET /api/v1/leaderboards/drivers` — period (week/month/alltime), metric (rides/earnings/rating), pagination |
-| Passenger leaderboard | ✅ | `GET /api/v1/leaderboards/passengers` — period (week/month/alltime), metric (rides/tips/ratings), pagination |
+| Passenger leaderboard | ✅ | `GET /api/v1/leaderboards/passengers` — period (week/month/alltime), metric (rides/tips/ratings), pagination. Ratings metric = driver thumbs-up approval rate |
 
 ### 1.9 Tips (`src/routes/tip.ts`)
 | Feature | Status | Notes |
@@ -155,7 +156,7 @@
 ### 1.13 Prisma / Database
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Full schema (525+ lines) | ✅ | `prisma/schema.prisma` — all models, `preferredDriverId` added to Ride |
+| Full schema (525+ lines) | ✅ | `prisma/schema.prisma` — all models, `preferredDriverId` on Ride, `PassengerFeedback` model for driver→passenger feedback |
 | PostgreSQL (Supabase) | ✅ | Migrated from MySQL to Supabase PostgreSQL with connection pooling |
 | Seed script | ✅ | `prisma/seed.ts` — Digos City, fare rate, system config, owner account |
 | Database connection | ✅ | Supabase session pooler (IPv4) |
@@ -182,7 +183,7 @@
 | Passenger Profile | ✅ | `src/pages/passenger/Profile.tsx` | Profile with saved places |
 | Passenger History | ✅ | `src/pages/passenger/History.tsx` | Ride history with rate, report, rebook (subscription-gated) |
 | Passenger Leaderboard | ✅ | `src/pages/shared/Leaderboard.tsx` | This Week / This Month / All Time tabs, rides/tips/ratings metrics |
-| Driver Home | ✅ | `src/pages/driver/Home.tsx` | Online toggle, pending rides, active ride, counter-offer, rebook badge |
+| Driver Home | ✅ | `src/pages/driver/Home.tsx` | Online toggle, pending rides, active ride, counter-offer, rebook badge, post-ride passenger feedback modal (thumbs up/down) |
 | Driver Earnings | ✅ | `src/pages/driver/Earnings.tsx` | Daily/weekly/monthly/all-time earnings |
 | Driver Profile | ✅ | `src/pages/driver/Profile.tsx` | Profile with subscription status |
 | Driver Leaderboard | ✅ | `src/pages/shared/Leaderboard.tsx` | This Week / This Month / All Time tabs, rides/earnings/rating metrics |
@@ -237,7 +238,7 @@ Users can:
 2. Sign in with **Phone OTP** (Firebase) or **Google Sign-In**
 3. Select role (Passenger/Driver/Staff/Owner)
 4. **Passenger**: Book rides, see fare estimates, track active ride, rate/report drivers, emergency button, share ride, view history, rebook (if driver has Pro), view leaderboard
-5. **Driver**: Go online/offline, see pending ride requests, accept/counter-offer/decline, manage active ride, view earnings, view leaderboard, see rebook badges
+5. **Driver**: Go online/offline, see pending ride requests, accept/counter-offer/decline, manage active ride, give passenger feedback (thumbs up/down), view earnings, view leaderboard, see rebook badges
 6. **Admin/Owner**: View dashboard with stats (including total fares), manage KYC, drivers, rides, reports, passengers, subscriptions, tips, ratings, strikes, emergencies, system config
 7. Logout
 
@@ -247,7 +248,8 @@ Users can:
 
 - **Monetization**: Driver subscriptions (FREE/PRO) + passenger tips — platform never handles ride fares (cash-only, direct passenger→driver)
 - **Rebook as subscription perk**: Only available if original driver has ACTIVE subscription; ride request visible only to the preferred driver
-- **Leaderboards**: Computed via aggregation queries (no pre-computed rank column), supports week/month/alltime periods
+- **Leaderboards**: Computed via aggregation queries (no pre-computed rank column), supports week/month/alltime periods. Both drivers and passengers can see both leaderboards via Drivers/Passengers toggle. Passenger "ratings" metric uses driver thumbs-up approval rate.
+- **Driver→Passenger feedback**: After completing a ride, drivers can give thumbs up/down to the passenger. One feedback per ride. Used for passenger leaderboard approval rate metric.
 - **Subscription tiers**: Only FREE and PRO (ELITE removed from schema)
 - **Admin earnings**: Shows subscription revenue + tip revenue (not ride fares, which are driver cash earnings)
 - **Total fares card**: Shows sum of finalFare from completed rides (driver cash earnings audit, not platform revenue)

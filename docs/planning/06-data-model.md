@@ -91,6 +91,7 @@ model Passenger {
   savedPlaces   SavedPlace[]
   platformTips  Tip[]    @relation("TipFrom") // passenger → platform tips
   reviewsGiven  Review[] @relation("ReviewFrom")
+  feedbackReceived PassengerFeedback[] @relation("FeedbackTo")
   documents     Document[]
   badges        PassengerBadge[]
   points        PassengerPoints[]
@@ -123,6 +124,7 @@ model Driver {
   subscriptions     Subscription[]
   // Note: Tips go to platform, not driver. No driver tip relation.
   reviewsReceived   Review[]      @relation("ReviewTo")
+  feedbackGiven     PassengerFeedback[] @relation("FeedbackFrom")
   badges            DriverBadge[]
   points            DriverPoints[]
   devices           Device[]
@@ -184,6 +186,7 @@ model Ride {
   statusHistory   RideStatus[]
   tip             Tip?
   review          Review?
+  passengerFeedback PassengerFeedback?
   reports         Report[]
   emergencyEvents EmergencyEvent[]
   strike          Strike?
@@ -233,6 +236,20 @@ model Review {
   ride        Ride     @relation(fields: [rideId], references: [id])
   reviewer    Passenger @relation("ReviewFrom", fields: [reviewerId], references: [id])
   reviewee    Driver    @relation("ReviewTo", fields: [revieweeId], references: [id])
+}
+
+model PassengerFeedback {
+  id              String   @id @default(uuid())
+  rideId          String   @unique
+  fromDriverId    String
+  toPassengerId   String
+  thumbsUp        Boolean  // true = thumbs up, false = thumbs down
+  comment         String?
+  createdAt       DateTime @default(now())
+
+  ride            Ride      @relation(fields: [rideId], references: [id])
+  from            Driver    @relation("FeedbackFrom", fields: [fromDriverId], references: [id])
+  to              Passenger @relation("FeedbackTo", fields: [toPassengerId], references: [id])
 }
 
 model Document {

@@ -180,7 +180,7 @@
 - [ ] **Disclaimer banner**: "Estimated fares shown. Actual cash collection may vary. Platform does not handle ride payments."
 
 #### Post-Ride (Driver Side)
-- [ ] **Thumbs Up / Thumbs Down** the passenger — quick feedback
+- [x] **Thumbs Up / Thumbs Down** the passenger — quick feedback (modal after completing ride, one per ride)
 - [ ] **Report Passenger** — categories: no-show, abusive behavior, damaged vehicle, refused to pay, other
 - [ ] Optional photo attachment for reports
 
@@ -442,7 +442,7 @@ Public-facing marketing site served at root domain.
 - [ ] **Moderate ratings**: Hide/soft-delete abusive or fake ratings (with reason, visible to admin only)
 - [x] **Rating analytics**: Platform-wide average rating displayed
 - [ ] **Thumbs up/down analytics**: Overall thumbs ratio per driver, per passenger, platform-wide trends
-- [ ] **Driver-submitted passenger feedback**: View all driver thumbs up/down on passengers (used for matching quality)
+- [x] **Driver-submitted passenger feedback**: View all driver thumbs up/down on passengers (used for matching quality)
 
 #### Driver Gamification & Engagement
 - [x] **Driver Leaderboard viewer** (rides, earnings, rating — weekly/monthly/all-time)
