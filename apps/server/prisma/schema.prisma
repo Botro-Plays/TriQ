@@ -156,6 +156,7 @@ model Driver {
   subscriptions     Subscription[]
   reviewsReceived   Review[]      @relation("ReviewTo")
   feedbackGiven     PassengerFeedback[] @relation("FeedbackFrom")
+  platformTips      Tip[]    @relation("TipFromDriver")
   badges            DriverBadge[]
   points            DriverPoints[]
   devices           Device[]
@@ -255,7 +256,8 @@ model RideStatus {
 model Tip {
   id          String   @id @default(uuid())
   rideId      String   @unique
-  passengerId String
+  passengerId String?
+  driverId    String?
   amount      Int      // in centavos
   paymongoId  String?
   status      String   @default("PENDING") // PENDING, PAID, FAILED
@@ -263,7 +265,8 @@ model Tip {
   paidAt      DateTime?
 
   ride        Ride     @relation(fields: [rideId], references: [id])
-  passenger   Passenger @relation("TipFrom", fields: [passengerId], references: [id])
+  passenger   Passenger? @relation("TipFrom", fields: [passengerId], references: [id])
+  driver      Driver?    @relation("TipFromDriver", fields: [driverId], references: [id])
 }
 
 // Reviews

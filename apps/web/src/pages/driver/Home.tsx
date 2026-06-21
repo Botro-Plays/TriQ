@@ -3,7 +3,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
 import { getCurrentLocation, watchLocation, clearWatch, type GeoError } from '../../lib/geolocation';
-import { Phone, Navigation, X, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Phone, Navigation, X, ThumbsUp, ThumbsDown, Heart } from 'lucide-react';
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -84,6 +84,12 @@ export default function DriverHome() {
   const [feedbackRideId, setFeedbackRideId] = useState<string | null>(null);
   const [feedbackPassengerName, setFeedbackPassengerName] = useState('');
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  // Platform tip state
+  const [showTipModal, setShowTipModal] = useState(false);
+  const [tipAmount, setTipAmount] = useState(0);
+  const [tipCustom, setTipCustom] = useState('');
+  const [tipping, setTipping] = useState(false);
+  const [tipSuccess, setTipSuccess] = useState(false);
 
   // Get driver profile
   useEffect(() => {
@@ -312,6 +318,24 @@ export default function DriverHome() {
     setFeedbackRideId(null);
     setFeedbackPassengerName('');
     setFeedbackSubmitting(false);
+  };
+
+  const submitPlatformTip = async () => {
+    if (tipAmount < 100) return;
+    setTipping(true);
+    try {
+      const res = await api.post('/tips', {
+        amount: tipAmount,
+        rideId: feedbackRideId || undefined,
+      });
+      if (res.data.checkoutUrl) {
+        window.location.href = res.data.checkoutUrl;
+      } else {
+        setTipSuccess(true);
+        setShowTipModal(false);
+        setTimeout(() => setTipSuccess(false), 3000);
+      }
+    } catch {} finally { setTipping(false); }
   };
 
   const mapMarkers = [
@@ -617,6 +641,72 @@ export default function DriverHome() {
               className="w-full text-center text-xs text-gray-500 hover:text-gray-400"
             >
               Skip
+            </button>
+            {!tipSuccess && (
+              <button
+                onClick={() => setShowTipModal(true)}
+                className="w-full h-10 rounded-lg bg-triq-cyan/10 text-triq-cyan border border-triq-cyan/30 text-sm font-medium flex items-center justify-center gap-1.5"
+              >
+                <Heart size={14} />
+                Tip TriQ Platform
+              </button>
+            )}
+            {tipSuccess && (
+              <div className="w-full h-10 rounded-lg bg-green-500/10 text-green-400 text-sm font-medium flex items-center justify-center gap-1.5">
+                <Heart size={14} /> Tip Created!
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Platform tip modal */}
+      {showTipModal && (
+        <div className="fixed inset-0 z-[2100] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowTipModal(false)}>
+          <div className="bg-triq-slate rounded-xl border border-triq-light/30 p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Heart size={18} className="text-triq-cyan" /> Tip TriQ
+              </h3>
+              <button onClick={() => setShowTipModal(false)} className="text-gray-400 hover:text-white"><X size={18} /></button>
+            </div>
+            <p className="text-sm text-gray-400">Support the platform with a small tip. Pay via GCash, Maya, or card.</p>
+            <div className="flex gap-2 flex-wrap">
+              {[1000, 2000, 5000, 10000].map((amt) => (
+                <button
+                  key={amt}
+                  onClick={() => { setTipAmount(amt); setTipCustom(''); }}
+                  className={`px-3 h-9 rounded-lg text-sm font-medium transition-all active:scale-90 ${
+                    tipAmount === amt && !tipCustom
+                      ? 'bg-triq-cyan text-triq-dark'
+                      : 'bg-triq-light/10 text-gray-400 hover:bg-triq-light/20'
+                  }`}
+                >
+                  ₱{(amt / 100).toFixed(0)}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">₱</span>
+              <input
+                type="number"
+                min="1"
+                value={tipCustom}
+                onChange={(e) => {
+                  setTipCustom(e.target.value);
+                  const parsed = parseInt(e.target.value) || 0;
+                  setTipAmount(parsed > 0 ? parsed * 100 : 0);
+                }}
+                placeholder="Custom amount"
+                className="flex-1 h-9 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+              />
+            </div>
+            <button
+              onClick={submitPlatformTip}
+              disabled={tipping || tipAmount < 100}
+              className="w-full h-10 rounded-lg bg-triq-cyan text-triq-dark font-bold text-sm disabled:opacity-40"
+            >
+              {tipping ? 'Processing...' : `Tip ₱${(tipAmount / 100).toFixed(0)}`}
             </button>
           </div>
         </div>

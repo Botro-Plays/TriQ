@@ -7,7 +7,7 @@ const router = Router();
 // POST /api/v1/tips — create platform tip (initiates PayMongo checkout)
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const { passengerId, amount, rideId } = req.body;
+    const { passengerId, driverId, amount, rideId } = req.body;
     if (typeof amount !== 'number' || amount < 100) {
       res.status(400).json({ error: 'amount (min 100 centavos = ₱1) is required' });
       return;
@@ -19,8 +19,16 @@ router.post('/', async (req: AuthRequest, res) => {
       const passenger = await prisma.passenger.findUnique({ where: { userId: req.user.userId } });
       resolvedPassengerId = passenger?.id;
     }
-    if (!resolvedPassengerId) {
-      res.status(400).json({ error: 'Could not determine passenger — provide passengerId' });
+
+    // Resolve driverId — from body or from auth user
+    let resolvedDriverId = driverId;
+    if (!resolvedDriverId && req.user?.userId) {
+      const driver = await prisma.driver.findUnique({ where: { userId: req.user.userId } });
+      resolvedDriverId = driver?.id;
+    }
+
+    if (!resolvedPassengerId && !resolvedDriverId) {
+      res.status(400).json({ error: 'Could not determine user — provide passengerId or driverId' });
       return;
     }
 
@@ -31,7 +39,8 @@ router.post('/', async (req: AuthRequest, res) => {
       // Dev mode — create tip as PENDING without PayMongo
       const tip = await prisma.tip.create({
         data: {
-          passengerId: resolvedPassengerId,
+          passengerId: resolvedPassengerId || null,
+          driverId: resolvedDriverId || null,
           rideId: rideId || null,
           amount,
           status: 'PENDING',
@@ -43,6 +52,7 @@ router.post('/', async (req: AuthRequest, res) => {
 
     // Create PayMongo checkout session
     const baseUrl = process.env.WEB_APP_URL || `https://${req.headers.host}`;
+    const redirectBase = resolvedDriverId ? '/driver' : '/passenger';
     const response = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
       method: 'POST',
       headers: {
@@ -65,8 +75,8 @@ router.post('/', async (req: AuthRequest, res) => {
               },
             ],
             payment_method_types: ['gcash', 'maya', 'card'],
-            success_url: `${baseUrl}/passenger?tip=success`,
-            failed_url: `${baseUrl}/passenger?tip=failed`,
+            success_url: `${baseUrl}${redirectBase}?tip=success`,
+            failed_url: `${baseUrl}${redirectBase}?tip=failed`,
             reference_number: '',
           },
         },
@@ -84,7 +94,8 @@ router.post('/', async (req: AuthRequest, res) => {
 
     const tip = await prisma.tip.create({
       data: {
-        passengerId: resolvedPassengerId,
+        passengerId: resolvedPassengerId || null,
+        driverId: resolvedDriverId || null,
         rideId: rideId || null,
         amount,
         status: 'PENDING',
