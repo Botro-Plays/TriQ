@@ -23,6 +23,8 @@ interface ActiveRide {
   pickupAddress: string;
   dropoffAddress: string;
   estimatedFare: number;
+  counterOfferedFare: number | null;
+  counterOfferExpiresAt: string | null;
   passenger: { name: string };
   driver?: { id: string; name: string; plateNumber: string; tricycleModel: string | null; rating: number; currentLat: number | null; currentLng: number | null };
 }
@@ -551,7 +553,10 @@ export default function PassengerHome() {
 }
 
 function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: () => void }) {
+  const [counterLoading, setCounterLoading] = useState(false);
   const fare = ride.estimatedFare / 100;
+  const counterFare = ride.counterOfferedFare ? ride.counterOfferedFare / 100 : null;
+  const isCounterOffered = ride.status === 'COUNTER_OFFERED' && counterFare !== null;
   const statusLabels: Record<string, string> = {
     REQUESTED: 'Waiting for driver...',
     ACCEPTED: 'Driver assigned — heading to pickup',
@@ -563,12 +568,61 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: () => 
     CANCELLED: 'Ride cancelled',
   };
 
+  const acceptCounter = async () => {
+    setCounterLoading(true);
+    try {
+      await api.post(`/rides/${ride.id}/counter-offer/accept`);
+    } catch {} finally {
+      setCounterLoading(false);
+    }
+  };
+
+  const rejectCounter = async () => {
+    setCounterLoading(true);
+    try {
+      await api.post(`/rides/${ride.id}/counter-offer/reject`);
+    } catch {} finally {
+      setCounterLoading(false);
+    }
+  };
+
   return (
     <div className="card p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-white">{statusLabels[ride.status] || ride.status}</h3>
         <span className="text-triq-yellow font-bold text-lg">₱{fare.toFixed(0)}</span>
       </div>
+
+      {/* Counter-offer panel */}
+      {isCounterOffered && (
+        <div className="bg-triq-yellow/10 border border-triq-yellow/30 rounded-lg p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-300">Driver proposes:</span>
+            <span className="text-triq-yellow font-bold text-xl">₱{counterFare!.toFixed(0)}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-400">Original estimate:</span>
+            <span className="text-gray-300 line-through">₱{fare.toFixed(0)}</span>
+          </div>
+          <p className="text-[11px] text-gray-500">Expires in 5 minutes. Accept to proceed at this fare, or reject to wait for another driver.</p>
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={acceptCounter}
+              disabled={counterLoading}
+              className="flex-1 h-10 rounded-lg bg-green-500 text-white font-bold text-sm active:scale-[0.97] disabled:opacity-40"
+            >
+              {counterLoading ? '...' : 'Accept'}
+            </button>
+            <button
+              onClick={rejectCounter}
+              disabled={counterLoading}
+              className="flex-1 h-10 rounded-lg border border-red-500/30 text-red-400 text-sm font-medium hover:bg-red-500/10 disabled:opacity-40"
+            >
+              {counterLoading ? '...' : 'Reject'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2 text-sm">
         <div className="flex items-start gap-2">

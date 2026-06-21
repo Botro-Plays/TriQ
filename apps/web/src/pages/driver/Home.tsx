@@ -165,11 +165,12 @@ export default function DriverHome() {
 
   const submitCounterOffer = async () => {
     if (!driverId || !counterOfferRideId) return;
-    const fare = parseInt(counterOfferFare);
-    if (isNaN(fare) || fare <= 0) return;
+    const farePesos = parseInt(counterOfferFare);
+    if (isNaN(farePesos) || farePesos <= 0) return;
+    const fareCentavos = farePesos * 100;
     setLoading(true);
     try {
-      await api.post(`/rides/${counterOfferRideId}/counter-offer`, { driverId, fare });
+      await api.post(`/rides/${counterOfferRideId}/counter-offer`, { driverId, fare: fareCentavos });
       setPendingRides((prev) => prev.filter((r) => r.id !== counterOfferRideId));
       setCounterOfferRideId(null);
       setCounterOfferFare('');
