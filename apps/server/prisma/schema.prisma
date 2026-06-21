@@ -228,6 +228,7 @@ model Ride {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  startedAt       DateTime?
   completedAt     DateTime?
 }
 

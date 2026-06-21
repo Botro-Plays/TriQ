@@ -419,7 +419,7 @@ router.post('/:id/start', async (req, res) => {
 
     const updated = await prisma.ride.update({
       where: { id: ride.id },
-      data: { status: 'IN_PROGRESS' },
+      data: { status: 'IN_PROGRESS', startedAt: new Date() },
     });
 
     await prisma.rideStatus.create({

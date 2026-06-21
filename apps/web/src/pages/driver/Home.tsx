@@ -37,6 +37,7 @@ interface ActiveRide {
   counterOfferedFare: number | null;
   counterOfferExpiresAt: string | null;
   negotiatedFare: number | null;
+  startedAt: string | null;
   passenger: { id: string; name: string; user: { phoneNumber: string } };
 }
 
@@ -226,9 +227,12 @@ export default function DriverHome() {
     if (!activeRide) return;
     setLoading(true);
     try {
-      await api.post(`/rides/${activeRide.id}/${action}`);
+      const { data } = await api.post(`/rides/${activeRide.id}/${action}`);
       if (action === 'complete') {
         setActiveRide(null);
+      } else {
+        // Update local state immediately to prevent double-clicks
+        setActiveRide((prev) => prev ? { ...prev, status: data.status || (action === 'arriving' ? 'ARRIVING' : 'IN_PROGRESS') } : prev);
       }
     } catch (err: any) {
       setError(err.response?.data?.error || `Failed to ${action} ride`);
@@ -268,20 +272,20 @@ export default function DriverHome() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-2xl font-bold text-triq-yellow">Driver Dashboard</h2>
         <div className="flex items-center gap-2">
           {isOnline && (
             <button
               onClick={updateLocation}
-              className="px-3 h-9 rounded-lg text-sm font-bold bg-triq-cyan/20 text-triq-cyan border border-triq-cyan/30 active:scale-[0.97]"
+              className="px-3 h-9 rounded-lg text-xs font-bold bg-triq-cyan/20 text-triq-cyan border border-triq-cyan/30 active:scale-[0.97] whitespace-nowrap"
             >
-              📍 Update Location
+              📍 Update
             </button>
           )}
           <button
             onClick={isOnline ? goOffline : goOnline}
-            className={`px-4 h-9 rounded-lg text-sm font-bold ${
+            className={`px-4 h-9 rounded-lg text-sm font-bold whitespace-nowrap ${
               isOnline ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
             }`}
           >
@@ -339,6 +343,42 @@ export default function DriverHome() {
               <span className="text-triq-yellow font-bold text-lg">₱{(activeRide.counterOfferedFare / 100).toFixed(0)}</span>
             </div>
           )}
+
+          {activeRide.status === 'IN_PROGRESS' && (() => {
+            const dist = location && activeRide
+              ? (() => {
+                  const R = 6371;
+                  const dLat = ((activeRide.dropoffLat - location.lat) * Math.PI) / 180;
+                  const dLng = ((activeRide.dropoffLng - location.lng) * Math.PI) / 180;
+                  const a = Math.sin(dLat / 2) ** 2 + Math.cos((location.lat * Math.PI) / 180) * Math.cos((activeRide.dropoffLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+                  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                })()
+              : 0;
+            const baseEta = Math.max(1, Math.round(dist * 3));
+            const etaMin = Math.max(1, baseEta - 1);
+            const etaMax = baseEta + 3;
+            const elapsed = activeRide.startedAt ? Math.floor((Date.now() - new Date(activeRide.startedAt).getTime()) / 60000) : 0;
+            const showReminder = elapsed >= baseEta;
+            return (
+              <div className="space-y-2">
+                <div className="bg-triq-cyan/10 border border-triq-cyan/30 rounded-lg p-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-300">Estimated arrival</p>
+                    <p className="text-triq-cyan font-bold text-lg">{etaMin}–{etaMax} min</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400">{dist.toFixed(1)} km to dropoff</p>
+                    <p className="text-xs text-gray-500">{elapsed} min elapsed</p>
+                  </div>
+                </div>
+                {showReminder && (
+                  <div className="bg-triq-yellow/10 border border-triq-yellow/30 rounded-lg p-3">
+                    <p className="text-triq-yellow text-sm font-semibold">📍 You should be near the drop-off. Tap "Complete Ride" after dropping off the passenger.</p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {activeRide.status !== 'COUNTER_OFFERED' && (
             <>

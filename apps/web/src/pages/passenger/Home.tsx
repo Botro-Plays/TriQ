@@ -26,6 +26,7 @@ interface ActiveRide {
   counterOfferedFare: number | null;
   counterOfferExpiresAt: string | null;
   negotiatedFare: number | null;
+  startedAt: string | null;
   passenger: { name: string };
   driver?: { id: string; name: string; plateNumber: string; tricycleModel: string | null; rating: number; currentLat: number | null; currentLng: number | null };
 }
@@ -203,10 +204,10 @@ export default function PassengerHome() {
     }
   };
 
-  const cancelRide = async () => {
+  const cancelRide = async (reason?: string) => {
     if (!activeRide) return;
     try {
-      await api.post(`/rides/${activeRide.id}/cancel`, { reason: 'Cancelled by passenger' });
+      await api.post(`/rides/${activeRide.id}/cancel`, { reason: reason || 'Cancelled by passenger' });
       setActiveRide(null);
       setStep('idle');
     } catch {}
@@ -265,7 +266,7 @@ export default function PassengerHome() {
           <div className="inline-block w-8 h-8 border-2 border-triq-cyan/30 border-t-triq-cyan rounded-full animate-spin mb-3" />
           <p className="text-white font-semibold">Searching for drivers...</p>
           <p className="text-gray-400 text-sm mt-1">Waiting for a driver to accept</p>
-          <button onClick={cancelRide} className="mt-4 text-sm text-red-400 hover:text-red-300">
+          <button onClick={() => cancelRide()} className="mt-4 text-sm text-red-400 hover:text-red-300">
             Cancel request
           </button>
         </div>
@@ -559,12 +560,16 @@ export default function PassengerHome() {
   );
 }
 
-function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: () => void }) {
+function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reason?: string) => void }) {
   const [counterLoading, setCounterLoading] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelOther, setCancelOther] = useState('');
   const counterFare = ride.counterOfferedFare ? ride.counterOfferedFare / 100 : null;
   const isCounterOffered = ride.status === 'COUNTER_OFFERED' && counterFare !== null;
   const isCounterAccepted = ride.status === 'COUNTER_OFFER_ACCEPTED' && ride.negotiatedFare;
   const fare = (isCounterAccepted ? ride.negotiatedFare! : ride.estimatedFare) / 100;
+  const isInProgress = ride.status === 'IN_PROGRESS';
   const statusLabels: Record<string, string> = {
     REQUESTED: 'Waiting for driver...',
     ACCEPTED: 'Driver assigned — heading to pickup',
@@ -574,6 +579,33 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: () => 
     IN_PROGRESS: 'Ride in progress',
     COMPLETED: 'Ride completed',
     CANCELLED: 'Ride cancelled',
+  };
+
+  const cancelReasons = [
+    'Changed my mind',
+    'Driver too far / taking too long',
+    'Found another ride',
+    'Unsafe driving',
+    'Overcharging / fare dispute',
+    'Rude behavior',
+    'Vehicle issue',
+    'Other (please specify)',
+  ];
+
+  const handleCancelClick = () => {
+    if (isInProgress) {
+      setShowCancelModal(true);
+    } else {
+      onCancel();
+    }
+  };
+
+  const confirmCancel = () => {
+    const reason = cancelReason === 'Other (please specify)' ? cancelOther : cancelReason;
+    setShowCancelModal(false);
+    setCancelReason('');
+    setCancelOther('');
+    onCancel(reason || 'Cancelled by passenger');
   };
 
   const acceptCounter = async () => {
@@ -598,8 +630,25 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: () => 
     <div className="card p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-white">{statusLabels[ride.status] || ride.status}</h3>
-        <span className="text-triq-yellow font-bold text-lg">₱{fare.toFixed(0)}</span>
+        <div className="text-right">
+          {isCounterAccepted && (
+            <span className="text-gray-500 line-through text-xs mr-1">₱{(ride.estimatedFare / 100).toFixed(0)}</span>
+          )}
+          <span className="text-triq-yellow font-bold text-lg">₱{fare.toFixed(0)}</span>
+        </div>
       </div>
+
+      {/* ETA during in-progress */}
+      {isInProgress && (() => {
+        const elapsed = ride.startedAt ? Math.floor((Date.now() - new Date(ride.startedAt).getTime()) / 60000) : 0;
+        const baseEta = Math.max(2, Math.round(elapsed > 0 ? 5 - elapsed * 0.3 : 5));
+        return (
+          <div className="bg-triq-cyan/10 border border-triq-cyan/30 rounded-lg p-3">
+            <p className="text-triq-cyan text-sm font-semibold">Estimated arrival: {Math.max(1, baseEta - 1)}–{baseEta + 3} min</p>
+            <p className="text-xs text-gray-400 mt-0.5">{elapsed} min elapsed</p>
+          </div>
+        );
+      })()}
 
       {/* Counter-offer panel */}
       {isCounterOffered && (
@@ -663,11 +712,64 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: () => 
 
       {!['COMPLETED', 'CANCELLED'].includes(ride.status) && (
         <button
-          onClick={onCancel}
+          onClick={handleCancelClick}
           className="w-full h-10 rounded-lg border border-red-500/30 text-red-400 text-sm font-medium hover:bg-red-500/10"
         >
           Cancel Ride
         </button>
+      )}
+
+      {/* Cancel confirmation modal for in-progress rides */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-triq-slate rounded-xl border border-triq-light/30 p-5 max-w-sm w-full space-y-4">
+            <div>
+              <h3 className="text-lg font-bold text-white">Cancel this ride?</h3>
+              <p className="text-sm text-gray-400 mt-1">
+                The ride is currently in progress. Cancelling will notify the driver. Please select a reason:
+              </p>
+            </div>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              {cancelReasons.map((r) => (
+                <label key={r} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="cancelReason"
+                    value={r}
+                    checked={cancelReason === r}
+                    onChange={() => setCancelReason(r)}
+                    className="accent-triq-cyan"
+                  />
+                  <span className="text-sm text-white">{r}</span>
+                </label>
+              ))}
+            </div>
+            {cancelReason === 'Other (please specify)' && (
+              <input
+                type="text"
+                value={cancelOther}
+                onChange={(e) => setCancelOther(e.target.value)}
+                placeholder="Please specify..."
+                className="w-full h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+              />
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowCancelModal(false); setCancelReason(''); setCancelOther(''); }}
+                className="flex-1 h-10 rounded-lg border border-triq-light/30 text-gray-300 text-sm font-medium"
+              >
+                Keep Ride
+              </button>
+              <button
+                onClick={confirmCancel}
+                disabled={!cancelReason || (cancelReason === 'Other (please specify)' && !cancelOther)}
+                className="flex-1 h-10 rounded-lg bg-red-500 text-white font-bold text-sm disabled:opacity-40"
+              >
+                Confirm Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
