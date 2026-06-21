@@ -255,7 +255,7 @@ model RideStatus {
 // Financial
 model Tip {
   id          String   @id @default(uuid())
-  rideId      String   @unique
+  rideId      String?  @unique
   passengerId String?
   driverId    String?
   amount      Int      // in centavos
@@ -264,7 +264,7 @@ model Tip {
   createdAt   DateTime @default(now())
   paidAt      DateTime?
 
-  ride        Ride     @relation(fields: [rideId], references: [id])
+  ride        Ride?    @relation(fields: [rideId], references: [id])
   passenger   Passenger? @relation("TipFrom", fields: [passengerId], references: [id])
   driver      Driver?    @relation("TipFromDriver", fields: [driverId], references: [id])
 }
