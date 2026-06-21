@@ -3,9 +3,26 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
 import { getCurrentLocation, type GeoError } from '../../lib/geolocation';
-import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X, TrendingUp, Search, Plus, Phone } from 'lucide-react';
+import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X, TrendingUp, Search, Plus, Phone, AlertTriangle, Share2, Star, ThumbsUp, ThumbsDown, Clock } from 'lucide-react';
 
 const DIGOS_CENTER: [number, number] = [6.7500, 125.3573];
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatElapsed(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
 
 interface NearbyDriver {
   id: string;
@@ -22,11 +39,16 @@ interface ActiveRide {
   status: string;
   pickupAddress: string;
   dropoffAddress: string;
+  pickupLat: number;
+  pickupLng: number;
+  dropoffLat: number;
+  dropoffLng: number;
   estimatedFare: number;
   counterOfferedFare: number | null;
   counterOfferExpiresAt: string | null;
   negotiatedFare: number | null;
   startedAt: string | null;
+  completedAt: string | null;
   passenger: { name: string };
   driver?: { id: string; name: string; plateNumber: string; tricycleModel: string | null; rating: number; currentLat: number | null; currentLng: number | null; user?: { phoneNumber: string } };
 }
@@ -608,16 +630,82 @@ export default function PassengerHome() {
   );
 }
 
+function ReportModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (category: string, description: string) => void }) {
+  const [category, setCategory] = useState('');
+  const [description, setDescription] = useState('');
+
+  const categories = [
+    'Unsafe driving',
+    'Overcharging / fare dispute',
+    'Rude behavior',
+    'Vehicle issue',
+    'No-show / abandoned ride',
+    'Harassment',
+    'Other',
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="bg-triq-slate rounded-xl border border-triq-light/30 p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-white">Report an issue</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={18} /></button>
+        </div>
+        <div className="space-y-1.5">
+          {categories.map((c) => (
+            <label key={c} className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="reportCategory" value={c} checked={category === c} onChange={() => setCategory(c)} className="accent-orange-400" />
+              <span className="text-sm text-white">{c}</span>
+            </label>
+          ))}
+        </div>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Describe what happened (optional)"
+          rows={3}
+          className="w-full px-3 py-2 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm resize-none"
+        />
+        <button
+          onClick={() => category && onSubmit(category, description)}
+          disabled={!category}
+          className="w-full h-10 rounded-lg bg-orange-500 text-white font-bold text-sm disabled:opacity-40"
+        >
+          Submit Report
+        </button>
+      </div>
+    </div>
+  );
+}
 function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reason?: string) => void }) {
   const [counterLoading, setCounterLoading] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelOther, setCancelOther] = useState('');
+  const [showReport, setShowReport] = useState(false);
+  const [showRateModal, setShowRateModal] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [thumbsUp, setThumbsUp] = useState<boolean | null>(null);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [showEmergency, setShowEmergency] = useState(false);
+  const [emergencyHoldProgress, setEmergencyHoldProgress] = useState(0);
+  const [emergencyTriggered, setEmergencyTriggered] = useState(false);
+  const [, setTick] = useState(0);
+  const emergencyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const counterFare = ride.counterOfferedFare ? ride.counterOfferedFare / 100 : null;
   const isCounterOffered = ride.status === 'COUNTER_OFFERED' && counterFare !== null;
   const isCounterAccepted = ride.status === 'COUNTER_OFFER_ACCEPTED' && ride.negotiatedFare;
   const fare = (isCounterAccepted ? ride.negotiatedFare! : ride.estimatedFare) / 100;
   const isInProgress = ride.status === 'IN_PROGRESS';
+  const isCompleted = ride.status === 'COMPLETED';
+
+  useEffect(() => {
+    if (!isInProgress) return;
+    const interval = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [isInProgress]);
+
   const statusLabels: Record<string, string> = {
     REQUESTED: 'Waiting for driver...',
     ACCEPTED: 'Driver assigned — heading to pickup',
@@ -656,6 +744,60 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
     onCancel(reason || 'Cancelled by passenger');
   };
 
+  const startEmergencyHold = () => {
+    setShowEmergency(true);
+    setEmergencyHoldProgress(0);
+    let progress = 0;
+    emergencyTimerRef.current = setInterval(() => {
+      progress += 100 / 30;
+      setEmergencyHoldProgress(progress);
+      if (progress >= 100) {
+        if (emergencyTimerRef.current) clearInterval(emergencyTimerRef.current);
+        triggerEmergency();
+      }
+    }, 100);
+  };
+
+  const cancelEmergencyHold = () => {
+    if (emergencyTimerRef.current) clearInterval(emergencyTimerRef.current);
+    setShowEmergency(false);
+    setEmergencyHoldProgress(0);
+  };
+
+  const triggerEmergency = async () => {
+    setEmergencyTriggered(true);
+    setShowEmergency(false);
+    setEmergencyHoldProgress(0);
+    try {
+      await api.post(`/rides/${ride.id}/emergency`, { description: 'Emergency triggered by passenger' });
+    } catch {}
+  };
+
+  const shareRide = () => {
+    const text = `TriQ Ride: ${ride.pickupAddress} → ${ride.dropoffAddress} | Fare: ₱${fare.toFixed(0)}${ride.driver ? ` | Driver: ${ride.driver.name} (${ride.driver.plateNumber})` : ''}`;
+    if (navigator.share) {
+      navigator.share({ title: 'My TriQ Ride', text });
+    } else {
+      navigator.clipboard?.writeText(text);
+    }
+  };
+
+  const submitReview = async () => {
+    if (rating === 0) return;
+    try {
+      await api.post(`/rides/${ride.id}/review`, { rating, thumbsUp, comment: reviewComment });
+      setReviewSubmitted(true);
+      setTimeout(() => setShowRateModal(false), 1500);
+    } catch {}
+  };
+
+  const submitReport = async (category: string, description: string) => {
+    try {
+      await api.post('/reports', { rideId: ride.id, category, description });
+      setShowReport(false);
+    } catch {}
+  };
+
   const acceptCounter = async () => {
     setCounterLoading(true);
     try {
@@ -686,14 +828,41 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
         </div>
       </div>
 
+      {/* Ride status timeline */}
+      <div className="flex items-center gap-1 text-xs">
+        {['REQUESTED', 'ACCEPTED', 'ARRIVING', 'IN_PROGRESS', 'COMPLETED'].map((s, i) => {
+          const statusOrder = ['REQUESTED', 'ACCEPTED', 'COUNTER_OFFERED', 'COUNTER_OFFER_ACCEPTED', 'ARRIVING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+          const rideOrder = statusOrder.indexOf(ride.status);
+          const stepOrder = statusOrder.indexOf(s);
+          const isActive = stepOrder <= rideOrder;
+          const isCurrent = s === ride.status;
+          return (
+            <div key={s} className="flex items-center flex-1">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${isActive ? (isCurrent ? 'bg-triq-cyan ring-2 ring-triq-cyan/30' : 'bg-triq-cyan/60') : 'bg-triq-light/20'}`} />
+              {i < 4 && <div className={`flex-1 h-0.5 ${isActive && stepOrder < rideOrder ? 'bg-triq-cyan/40' : 'bg-triq-light/10'}`} />}
+            </div>
+          );
+        })}
+      </div>
+
       {/* ETA during in-progress */}
       {isInProgress && (() => {
-        const elapsed = ride.startedAt ? Math.floor((Date.now() - new Date(ride.startedAt).getTime()) / 60000) : 0;
-        const baseEta = Math.max(2, Math.round(elapsed > 0 ? 5 - elapsed * 0.3 : 5));
+        const dist = ride.driver?.currentLat && ride.driver?.currentLng
+          ? haversineKm(ride.driver.currentLat, ride.driver.currentLng, ride.dropoffLat, ride.dropoffLng)
+          : 0;
+        const baseEta = Math.max(1, Math.round(dist * 3));
+        const etaMin = Math.max(1, baseEta - 1);
+        const etaMax = baseEta + 3;
+        const elapsedMs = ride.startedAt ? Date.now() - new Date(ride.startedAt).getTime() : 0;
         return (
-          <div className="bg-triq-cyan/10 border border-triq-cyan/30 rounded-lg p-3">
-            <p className="text-triq-cyan text-sm font-semibold">Estimated arrival: {Math.max(1, baseEta - 1)}–{baseEta + 3} min</p>
-            <p className="text-xs text-gray-400 mt-0.5">{elapsed} min elapsed</p>
+          <div className="bg-triq-cyan/10 border border-triq-cyan/30 rounded-lg p-3 flex items-center justify-between">
+            <div>
+              <p className="text-triq-cyan text-sm font-semibold">Estimated arrival: {etaMin}–{etaMax} min</p>
+              {dist > 0 && <p className="text-xs text-gray-400 mt-0.5">{dist.toFixed(2)} km away</p>}
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-500 font-mono flex items-center gap-1"><Clock size={10} /> {formatElapsed(elapsedMs)}</p>
+            </div>
           </div>
         );
       })()}
@@ -767,6 +936,54 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
         </div>
       )}
 
+      {/* Action buttons */}
+      <div className="flex gap-2">
+        {!['COMPLETED', 'CANCELLED'].includes(ride.status) && (
+          <>
+            <button
+              onPointerDown={startEmergencyHold}
+              onPointerUp={cancelEmergencyHold}
+              onPointerLeave={cancelEmergencyHold}
+              className={`flex-1 h-10 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 select-none ${
+                emergencyTriggered ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'
+              }`}
+            >
+              <AlertTriangle size={14} />
+              {emergencyTriggered ? 'Alert Sent' : 'Emergency'}
+            </button>
+            <button
+              onClick={shareRide}
+              className="h-10 w-10 rounded-lg bg-triq-light/10 text-gray-300 border border-triq-light/20 flex items-center justify-center active:scale-90 shrink-0"
+              title="Share ride details"
+            >
+              <Share2 size={16} />
+            </button>
+          </>
+        )}
+        {isCompleted && !reviewSubmitted && (
+          <button
+            onClick={() => setShowRateModal(true)}
+            className="flex-1 h-10 rounded-lg bg-triq-yellow text-triq-dark text-sm font-bold flex items-center justify-center gap-1.5"
+          >
+            <Star size={14} />
+            Rate Driver
+          </button>
+        )}
+        {reviewSubmitted && (
+          <div className="flex-1 h-10 rounded-lg bg-green-500/10 text-green-400 text-sm font-medium flex items-center justify-center gap-1.5">
+            <ThumbsUp size={14} /> Thanks for rating!
+          </div>
+        )}
+        {!['CANCELLED'].includes(ride.status) && (
+          <button
+            onClick={() => setShowReport(true)}
+            className="h-10 px-3 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/30 text-xs font-medium"
+          >
+            Report
+          </button>
+        )}
+      </div>
+
       {!['COMPLETED', 'CANCELLED'].includes(ride.status) && (
         <button
           onClick={handleCancelClick}
@@ -774,6 +991,65 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
         >
           Cancel Ride
         </button>
+      )}
+
+      {/* Emergency hold overlay */}
+      {showEmergency && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onPointerUp={cancelEmergencyHold}>
+          <div className="text-center space-y-4">
+            <div className="w-24 h-24 mx-auto rounded-full bg-red-500/20 border-4 border-red-500/40 flex items-center justify-center relative">
+              <AlertTriangle size={36} className="text-red-400" />
+              <svg className="absolute inset-0 -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="46" fill="none" stroke="rgb(239 68 68)" strokeWidth="4" strokeDasharray={`${(emergencyHoldProgress / 100) * 289} 289`} strokeLinecap="round" />
+              </svg>
+            </div>
+            <p className="text-white font-bold text-lg">Hold to trigger emergency</p>
+            <p className="text-gray-400 text-sm">Keep holding for 3 seconds to alert your emergency contact and TriQ admin</p>
+          </div>
+        </div>
+      )}
+
+      {/* Rate driver modal */}
+      {showRateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowRateModal(false)}>
+          <div className="bg-triq-slate rounded-xl border border-triq-light/30 p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-white">Rate your driver</h3>
+            <div className="flex gap-1 justify-center">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button key={n} onClick={() => setRating(n)} className="active:scale-90 transition-transform">
+                  <Star size={32} className={n <= rating ? 'text-triq-yellow fill-triq-yellow' : 'text-gray-600'} />
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-center">
+              <button onClick={() => setThumbsUp(true)} className={`px-4 h-10 rounded-lg flex items-center gap-1.5 text-sm font-medium ${thumbsUp === true ? 'bg-green-500/20 text-green-400 border border-green-500/40' : 'bg-triq-light/10 text-gray-400'}`}>
+                <ThumbsUp size={14} /> Good
+              </button>
+              <button onClick={() => setThumbsUp(false)} className={`px-4 h-10 rounded-lg flex items-center gap-1.5 text-sm font-medium ${thumbsUp === false ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-triq-light/10 text-gray-400'}`}>
+                <ThumbsDown size={14} /> Bad
+              </button>
+            </div>
+            <textarea
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              placeholder="Leave a comment (optional)"
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm resize-none"
+            />
+            <button
+              onClick={submitReview}
+              disabled={rating === 0}
+              className="w-full h-10 rounded-lg bg-triq-yellow text-triq-dark font-bold text-sm disabled:opacity-40"
+            >
+              Submit Review
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Report modal */}
+      {showReport && (
+        <ReportModal onClose={() => setShowReport(false)} onSubmit={submitReport} />
       )}
 
       {/* Cancel confirmation modal for in-progress rides */}

@@ -1,10 +1,26 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
 import { getCurrentLocation, watchLocation, clearWatch, type GeoError } from '../../lib/geolocation';
-import { Phone } from 'lucide-react';
-import { Navigation, X } from 'lucide-react';
+import { Phone, Navigation, X } from 'lucide-react';
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatElapsed(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
 
 const DIGOS_CENTER: [number, number] = [6.7500, 125.3573];
 
@@ -62,6 +78,8 @@ export default function DriverHome() {
   const [counterOfferRideId, setCounterOfferRideId] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const speedHistoryRef = useRef<{ time: number; lat: number; lng: number }[]>([]);
+  const [, setTick] = useState(0);
 
   // Get driver profile
   useEffect(() => {
@@ -73,9 +91,12 @@ export default function DriverHome() {
         // If already online, restore location from DB and restart location watch
         if (res.data.isOnline && res.data.currentLat && res.data.currentLng) {
           setLocation({ lat: res.data.currentLat, lng: res.data.currentLng });
+          speedHistoryRef.current = [{ time: Date.now(), lat: res.data.currentLat, lng: res.data.currentLng }];
           const id = watchLocation(
             (pos) => {
               setLocation({ lat: pos.lat, lng: pos.lng });
+              speedHistoryRef.current.push({ time: Date.now(), lat: pos.lat, lng: pos.lng });
+              if (speedHistoryRef.current.length > 20) speedHistoryRef.current.shift();
               api.patch(`/drivers/${res.data.id}/location`, { lat: pos.lat, lng: pos.lng }).catch(() => {});
             },
             (err) => { setError(err.message); },
@@ -118,6 +139,8 @@ export default function DriverHome() {
       const watchId = watchLocation(
         (p) => {
           setLocation({ lat: p.lat, lng: p.lng });
+          speedHistoryRef.current.push({ time: Date.now(), lat: p.lat, lng: p.lng });
+          if (speedHistoryRef.current.length > 20) speedHistoryRef.current.shift();
           api.patch(`/drivers/${driverId}/location`, { lat: p.lat, lng: p.lng }).catch(() => {});
         },
         (err: GeoError) => {
@@ -168,6 +191,30 @@ export default function DriverHome() {
   // Track location in ref so pending rides interval doesn't reset on every GPS update
   const locationRef = useRef(location);
   locationRef.current = location;
+
+  // Live ticking timer for elapsed time display
+  useEffect(() => {
+    if (!activeRide?.startedAt || activeRide.status !== 'IN_PROGRESS') return;
+    const interval = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [activeRide?.startedAt, activeRide?.status]);
+
+  // Compute current speed from GPS history
+  const computeCurrentSpeed = useCallback((): number => {
+    const history = speedHistoryRef.current;
+    if (history.length < 2) return 0;
+    const recent = history.slice(-5);
+    let totalSpeed = 0;
+    let count = 0;
+    for (let i = 1; i < recent.length; i++) {
+      const dt = (recent[i].time - recent[i - 1].time) / 1000;
+      if (dt < 1) continue;
+      const dist = haversineKm(recent[i - 1].lat, recent[i - 1].lng, recent[i].lat, recent[i].lng);
+      totalSpeed += dist / (dt / 3600);
+      count++;
+    }
+    return count > 0 ? totalSpeed / count : 0;
+  }, []);
 
   // Fetch pending rides when online and no active ride
   useEffect(() => {
@@ -346,20 +393,15 @@ export default function DriverHome() {
           )}
 
           {activeRide.status === 'IN_PROGRESS' && (() => {
-            const dist = location && activeRide
-              ? (() => {
-                  const R = 6371;
-                  const dLat = ((activeRide.dropoffLat - location.lat) * Math.PI) / 180;
-                  const dLng = ((activeRide.dropoffLng - location.lng) * Math.PI) / 180;
-                  const a = Math.sin(dLat / 2) ** 2 + Math.cos((location.lat * Math.PI) / 180) * Math.cos((activeRide.dropoffLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-                  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                })()
-              : 0;
-            const baseEta = Math.max(1, Math.round(dist * 3));
-            const etaMin = Math.max(1, baseEta - 1);
-            const etaMax = baseEta + 3;
-            const elapsed = activeRide.startedAt ? Math.floor((Date.now() - new Date(activeRide.startedAt).getTime()) / 60000) : 0;
-            const showReminder = elapsed >= baseEta;
+            const dist = location ? haversineKm(location.lat, location.lng, activeRide.dropoffLat, activeRide.dropoffLng) : 0;
+            const currentSpeed = computeCurrentSpeed();
+            const avgSpeed = currentSpeed > 2 ? currentSpeed : 20;
+            const baseEta = Math.max(1, Math.round((dist / avgSpeed) * 60));
+            const speedVariance = currentSpeed > 0 ? Math.min(5, Math.max(1, Math.round(60 / Math.max(5, currentSpeed)))) : 3;
+            const etaMin = Math.max(1, baseEta - speedVariance);
+            const etaMax = baseEta + speedVariance + 2;
+            const elapsedMs = activeRide.startedAt ? Date.now() - new Date(activeRide.startedAt).getTime() : 0;
+            const showReminder = elapsedMs / 60000 >= baseEta;
             return (
               <div className="space-y-2">
                 <div className="bg-triq-cyan/10 border border-triq-cyan/30 rounded-lg p-3 flex items-center justify-between">
@@ -368,8 +410,9 @@ export default function DriverHome() {
                     <p className="text-triq-cyan font-bold text-lg">{etaMin}–{etaMax} min</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-gray-400">{dist.toFixed(1)} km to dropoff</p>
-                    <p className="text-xs text-gray-500">{elapsed} min elapsed</p>
+                    <p className="text-xs text-gray-400">{dist.toFixed(2)} km to dropoff</p>
+                    <p className="text-xs text-gray-500 font-mono">{formatElapsed(elapsedMs)} elapsed</p>
+                    {currentSpeed > 0 && <p className="text-xs text-gray-600">{Math.round(currentSpeed)} km/h</p>}
                   </div>
                 </div>
                 {showReminder && (

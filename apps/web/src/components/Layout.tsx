@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import {
   Home, Map, User, DollarSign, LayoutDashboard, ShieldCheck,
-  Car, FlagTriangleRight, LogOut, Menu, X,
+  Car, FlagTriangleRight, LogOut, Menu, X, History,
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -19,6 +19,7 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
   PASSENGER: [
     { label: 'Home', path: '/passenger', icon: Home },
     { label: 'Map', path: '/passenger/map', icon: Map },
+    { label: 'History', path: '/passenger/history', icon: History },
     { label: 'Profile', path: '/passenger/profile', icon: User },
   ],
   DRIVER: [

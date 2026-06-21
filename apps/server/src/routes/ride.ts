@@ -160,6 +160,20 @@ router.get('/pending', async (req, res) => {
       return;
     }
 
+    // Auto-cancel stale REQUESTED rides (older than 5 minutes)
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000);
+    const staleRides = await prisma.ride.findMany({
+      where: { status: 'REQUESTED', createdAt: { lt: cutoff } },
+      select: { id: true, passengerId: true },
+    });
+    if (staleRides.length > 0) {
+      await Promise.all(staleRides.map(async (r) => {
+        await prisma.ride.update({ where: { id: r.id }, data: { status: 'CANCELLED' } });
+        await prisma.rideStatus.create({ data: { rideId: r.id, status: 'CANCELLED', actor: 'SYSTEM' } });
+        await prisma.passenger.update({ where: { id: r.passengerId }, data: { autoCancelledCount: { increment: 1 } } });
+      }));
+    }
+
     const rides: Array<{ id: string; pickupLat: number; pickupLng: number; [key: string]: any }> = await prisma.ride.findMany({
       where: { status: 'REQUESTED' },
       orderBy: { createdAt: 'asc' },
@@ -261,6 +275,7 @@ router.get('/active', async (req, res) => {
       include: {
         passenger: { select: { id: true, name: true, photoUrl: true, user: { select: { phoneNumber: true } } } },
         driver: { select: { id: true, name: true, plateNumber: true, tricycleModel: true, photoUrl: true, rating: true, currentLat: true, currentLng: true, user: { select: { phoneNumber: true } } } },
+        review: true,
       },
     });
 
@@ -589,6 +604,63 @@ router.post('/:id/counter-offer/reject', async (req, res) => {
   }
 });
 
+// POST /api/v1/rides/:id/review — passenger rates driver after ride
+router.post('/:id/review', async (req, res) => {
+  try {
+    const { rating, thumbsUp, comment } = req.body;
+    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
+      res.status(400).json({ error: 'rating must be 1-5' });
+      return;
+    }
+
+    const ride = await prisma.ride.findUnique({ where: { id: req.params.id } });
+    if (!ride) {
+      res.status(404).json({ error: 'Ride not found' });
+      return;
+    }
+    if (ride.status !== 'COMPLETED') {
+      res.status(409).json({ error: 'Can only review completed rides' });
+      return;
+    }
+    if (!ride.driverId) {
+      res.status(400).json({ error: 'No driver to review' });
+      return;
+    }
+
+    const existing = await prisma.review.findUnique({ where: { rideId: ride.id } });
+    if (existing) {
+      res.status(409).json({ error: 'Review already submitted' });
+      return;
+    }
+
+    const review = await prisma.review.create({
+      data: {
+        rideId: ride.id,
+        fromPassengerId: ride.passengerId,
+        toDriverId: ride.driverId,
+        rating,
+        thumbsUp: thumbsUp ?? null,
+        comment: comment || null,
+      },
+    });
+
+    // Update driver's aggregate rating
+    const driver = await prisma.driver.findUnique({ where: { id: ride.driverId } });
+    if (driver) {
+      const newCount = driver.reviewCount + 1;
+      const newRating = ((driver.rating * driver.reviewCount) + rating) / newCount;
+      await prisma.driver.update({
+        where: { id: ride.driverId },
+        data: { rating: Math.round(newRating * 10) / 10, reviewCount: newCount },
+      });
+    }
+
+    res.status(201).json(review);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to submit review', message: err.message });
+  }
+});
+
 // POST /api/v1/rides/:id/emergency — trigger emergency alert
 router.post('/:id/emergency', async (req, res) => {
   try {
@@ -613,6 +685,42 @@ router.post('/:id/emergency', async (req, res) => {
     res.status(201).json(event);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to trigger emergency', message: err.message });
+  }
+});
+
+// POST /api/v1/rides/auto-cancel — cancel stale REQUESTED rides (cron or on-demand)
+router.post('/auto-cancel', async (req, res) => {
+  try {
+    const timeoutMinutes = parseInt(req.body?.timeoutMinutes as string) || 5;
+    const cutoff = new Date(Date.now() - timeoutMinutes * 60 * 1000);
+
+    const staleRides = await prisma.ride.findMany({
+      where: {
+        status: 'REQUESTED',
+        createdAt: { lt: cutoff },
+      },
+      select: { id: true, passengerId: true },
+    });
+
+    let cancelledCount = 0;
+    for (const ride of staleRides) {
+      await prisma.ride.update({
+        where: { id: ride.id },
+        data: { status: 'CANCELLED' },
+      });
+      await prisma.rideStatus.create({
+        data: { rideId: ride.id, status: 'CANCELLED', actor: 'SYSTEM' },
+      });
+      await prisma.passenger.update({
+        where: { id: ride.passengerId },
+        data: { autoCancelledCount: { increment: 1 } },
+      });
+      cancelledCount++;
+    }
+
+    res.json({ cancelled: cancelledCount, cutoff });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to auto-cancel', message: err.message });
   }
 });
 

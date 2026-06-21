@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
-import { Phone, Car, Star, Shield, Bike } from 'lucide-react';
+import { Phone, Car, Star, Shield, Bike, MapPin } from 'lucide-react';
 
 interface DriverData {
+  id: string;
   name: string;
   plateNumber: string;
   tricycleModel: string | null;
   photoUrl: string | null;
   rating: number;
+  reviewCount: number;
   totalRides: number;
   totalEarnings: number;
   isOnline: boolean;
@@ -22,14 +24,32 @@ export default function DriverProfile() {
   const { user } = useAuthStore();
   const [driver, setDriver] = useState<DriverData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [radius, setRadius] = useState(2.0);
+  const [savingRadius, setSavingRadius] = useState(false);
+  const [radiusSaved, setRadiusSaved] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     api.get('/drivers', { params: { userId: user.id } })
-      .then((res) => setDriver(res.data))
+      .then((res) => {
+        setDriver(res.data);
+        setRadius(res.data.pickupRadius || 2.0);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user]);
+
+  const saveRadius = async () => {
+    if (!driver) return;
+    setSavingRadius(true);
+    try {
+      await api.patch(`/drivers/${driver.id}/radius`, { radius });
+      setRadiusSaved(true);
+      setTimeout(() => setRadiusSaved(false), 2000);
+    } catch {} finally {
+      setSavingRadius(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -94,6 +114,34 @@ export default function DriverProfile() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Pickup radius setting */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <MapPin size={18} className="text-triq-cyan" />
+          <h3 className="text-sm font-semibold text-white">Pickup Radius</h3>
+        </div>
+        <p className="text-xs text-gray-400">Set how far you're willing to travel to pick up a passenger.</p>
+        <div className="flex items-center gap-3">
+          <input
+            type="range"
+            min="0.5"
+            max="20"
+            step="0.5"
+            value={radius}
+            onChange={(e) => setRadius(parseFloat(e.target.value))}
+            className="flex-1 accent-triq-cyan"
+          />
+          <span className="text-triq-yellow font-bold text-sm w-16 text-right">{radius.toFixed(1)} km</span>
+        </div>
+        <button
+          onClick={saveRadius}
+          disabled={savingRadius}
+          className="w-full h-9 rounded-lg bg-triq-cyan text-triq-dark font-bold text-sm disabled:opacity-40"
+        >
+          {savingRadius ? 'Saving...' : radiusSaved ? 'Saved!' : 'Save Radius'}
+        </button>
       </div>
     </div>
   );

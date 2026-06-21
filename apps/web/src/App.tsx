@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import PassengerHome from './pages/passenger/Home';
 import PassengerMap from './pages/passenger/Map';
 import PassengerProfile from './pages/passenger/Profile';
+import PassengerHistory from './pages/passenger/History';
 
 // Driver pages
 import DriverHome from './pages/driver/Home';
@@ -54,6 +55,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['PASSENGER']}>
                 <PassengerProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/passenger/history"
+            element={
+              <ProtectedRoute allowedRoles={['PASSENGER']}>
+                <PassengerHistory />
               </ProtectedRoute>
             }
           />
