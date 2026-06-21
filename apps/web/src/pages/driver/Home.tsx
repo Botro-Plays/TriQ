@@ -3,7 +3,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
 import { getCurrentLocation, watchLocation, clearWatch, type GeoError } from '../../lib/geolocation';
-import { Phone, Navigation, X } from 'lucide-react';
+import { Phone, Navigation, X, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -81,6 +81,9 @@ export default function DriverHome() {
   const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const speedHistoryRef = useRef<{ time: number; lat: number; lng: number }[]>([]);
   const [, setTick] = useState(0);
+  const [feedbackRideId, setFeedbackRideId] = useState<string | null>(null);
+  const [feedbackPassengerName, setFeedbackPassengerName] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
 
   // Get driver profile
   useEffect(() => {
@@ -278,6 +281,8 @@ export default function DriverHome() {
     try {
       const { data } = await api.post(`/rides/${activeRide.id}/${action}`);
       if (action === 'complete') {
+        setFeedbackPassengerName(activeRide.passenger.name);
+        setFeedbackRideId(activeRide.id);
         setActiveRide(null);
       } else {
         // Update local state immediately to prevent double-clicks
@@ -296,6 +301,17 @@ export default function DriverHome() {
       await api.post(`/rides/${activeRide.id}/cancel`, { reason: 'Cancelled by driver' });
       setActiveRide(null);
     } catch {}
+  };
+
+  const submitPassengerFeedback = async (thumbsUp: boolean) => {
+    if (!feedbackRideId) return;
+    setFeedbackSubmitting(true);
+    try {
+      await api.post(`/rides/${feedbackRideId}/passenger-feedback`, { thumbsUp });
+    } catch {}
+    setFeedbackRideId(null);
+    setFeedbackPassengerName('');
+    setFeedbackSubmitting(false);
   };
 
   const mapMarkers = [
@@ -565,6 +581,44 @@ export default function DriverHome() {
         <div className="bg-triq-slate rounded-xl border border-triq-light/20 p-6 text-center">
           <p className="text-white font-semibold">You're offline</p>
           <p className="text-gray-400 text-sm mt-1">Go online to start receiving ride requests</p>
+        </div>
+      )}
+
+      {/* Passenger feedback modal — shown after completing a ride */}
+      {feedbackRideId && (
+        <div className="fixed inset-0 bg-black/60 z-[2000] flex items-center justify-center p-4" onClick={() => !feedbackSubmitting && setFeedbackRideId(null)}>
+          <div className="bg-triq-slate rounded-xl border border-triq-light/30 p-5 w-full max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">Rate your passenger</h3>
+              <button onClick={() => !feedbackSubmitting && setFeedbackRideId(null)} className="text-gray-400 hover:text-white"><X size={18} /></button>
+            </div>
+            <p className="text-sm text-gray-400">How was your ride with <span className="text-white font-semibold">{feedbackPassengerName}</span>?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => submitPassengerFeedback(true)}
+                disabled={feedbackSubmitting}
+                className="flex-1 h-16 rounded-lg bg-green-500/15 text-green-400 border border-green-500/30 flex flex-col items-center justify-center gap-1 active:scale-95 disabled:opacity-40"
+              >
+                <ThumbsUp size={24} />
+                <span className="text-xs font-medium">Good Passenger</span>
+              </button>
+              <button
+                onClick={() => submitPassengerFeedback(false)}
+                disabled={feedbackSubmitting}
+                className="flex-1 h-16 rounded-lg bg-red-500/15 text-red-400 border border-red-500/30 flex flex-col items-center justify-center gap-1 active:scale-95 disabled:opacity-40"
+              >
+                <ThumbsDown size={24} />
+                <span className="text-xs font-medium">Bad Experience</span>
+              </button>
+            </div>
+            <button
+              onClick={() => setFeedbackRideId(null)}
+              disabled={feedbackSubmitting}
+              className="w-full text-center text-xs text-gray-500 hover:text-gray-400"
+            >
+              Skip
+            </button>
+          </div>
         </div>
       )}
     </div>

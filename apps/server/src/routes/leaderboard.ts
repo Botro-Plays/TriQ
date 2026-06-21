@@ -215,43 +215,55 @@ router.get('/passengers', async (req, res) => {
         pages: Math.ceil(total.length / limit),
       });
     } else if (metric === 'ratings') {
-      // Passengers ranked by average rating they gave (positive contributors)
-      const reviewWhere: any = {};
-      if (startDate) reviewWhere.createdAt = { gte: startDate };
+      // Passengers ranked by driver thumbs-up approval rate
+      // Score = percentage of driver feedback that is thumbs up (0-100)
+      const feedbackWhere: any = {};
+      if (startDate) feedbackWhere.createdAt = { gte: startDate };
 
-      const results = await prisma.review.groupBy({
-        by: ['fromPassengerId'],
-        where: reviewWhere,
-        _avg: { rating: true },
-        _count: { id: true },
-        orderBy: { _avg: { rating: 'desc' } },
-        skip: (page - 1) * limit,
-        take: limit,
+      // Get total feedback counts per passenger
+      const totalCounts = await prisma.passengerFeedback.groupBy({
+        by: ['toPassengerId'],
+        where: feedbackWhere,
+        _count: { _all: true },
       });
 
-      const passengerIds = results.map((r) => r.fromPassengerId);
+      // Get thumbs-up counts per passenger
+      const thumbsUpCounts = await prisma.passengerFeedback.groupBy({
+        by: ['toPassengerId'],
+        where: { ...feedbackWhere, thumbsUp: true },
+        _count: { _all: true },
+      });
+
+      const thumbsUpMap = new Map(thumbsUpCounts.map((r) => [r.toPassengerId, r._count._all]));
+
+      // Merge and compute approval rate
+      const merged = totalCounts.map((r) => {
+        const total = r._count._all;
+        const thumbsUp = thumbsUpMap.get(r.toPassengerId) || 0;
+        const approvalRate = total > 0 ? Math.round((thumbsUp / total) * 100) : 0;
+        return { toPassengerId: r.toPassengerId, total, thumbsUp, approvalRate };
+      }).sort((a, b) => b.approvalRate - a.approvalRate || b.thumbsUp - a.thumbsUp);
+
+      const pageResults = merged.slice((page - 1) * limit, page * limit);
+
+      const passengerIds = pageResults.map((r) => r.toPassengerId);
       const passengers = await prisma.passenger.findMany({
         where: { id: { in: passengerIds } },
         select: { id: true, name: true, photoUrl: true, trustScore: true },
       });
       const passengerMap = new Map(passengers.map((p) => [p.id, p]));
 
-      const total = await prisma.review.groupBy({
-        by: ['fromPassengerId'],
-        where: reviewWhere,
-        _avg: { rating: true },
-      });
-
       res.json({
-        entries: results.map((r, i) => ({
-          ...passengerMap.get(r.fromPassengerId),
+        entries: pageResults.map((r, i) => ({
+          ...passengerMap.get(r.toPassengerId),
           rank: (page - 1) * limit + i + 1,
-          score: r._avg.rating || 0,
-          reviewCount: r._count.id,
+          score: r.approvalRate,
+          feedbackCount: r.total,
+          thumbsUpCount: r.thumbsUp,
         })).filter((e) => e.id),
-        total: total.length,
+        total: merged.length,
         page,
-        pages: Math.ceil(total.length / limit),
+        pages: Math.ceil(merged.length / limit),
       });
     } else {
       res.status(400).json({ error: 'Invalid metric. Use: rides, tips, ratings' });

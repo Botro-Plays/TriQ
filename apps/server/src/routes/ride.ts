@@ -695,6 +695,51 @@ router.post('/:id/review', async (req, res) => {
   }
 });
 
+// POST /api/v1/rides/:id/passenger-feedback — driver gives thumbs up/down to passenger
+router.post('/:id/passenger-feedback', async (req, res) => {
+  try {
+    const { thumbsUp, comment } = req.body;
+    if (typeof thumbsUp !== 'boolean') {
+      res.status(400).json({ error: 'thumbsUp (boolean) is required' });
+      return;
+    }
+
+    const ride = await prisma.ride.findUnique({ where: { id: req.params.id } });
+    if (!ride) {
+      res.status(404).json({ error: 'Ride not found' });
+      return;
+    }
+    if (ride.status !== 'COMPLETED') {
+      res.status(409).json({ error: 'Can only give feedback on completed rides' });
+      return;
+    }
+    if (!ride.driverId) {
+      res.status(400).json({ error: 'No driver assigned to this ride' });
+      return;
+    }
+
+    const existing = await prisma.passengerFeedback.findUnique({ where: { rideId: ride.id } });
+    if (existing) {
+      res.status(409).json({ error: 'Feedback already submitted for this ride' });
+      return;
+    }
+
+    const feedback = await prisma.passengerFeedback.create({
+      data: {
+        rideId: ride.id,
+        fromDriverId: ride.driverId,
+        toPassengerId: ride.passengerId,
+        thumbsUp,
+        comment: comment || null,
+      },
+    });
+
+    res.status(201).json(feedback);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to submit passenger feedback', message: err.message });
+  }
+});
+
 // POST /api/v1/rides/:id/emergency — trigger emergency alert
 router.post('/:id/emergency', async (req, res) => {
   try {

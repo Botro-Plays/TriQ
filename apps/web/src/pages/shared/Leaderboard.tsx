@@ -15,6 +15,8 @@ interface LeaderboardEntry {
   trustScore?: number;
   tipCount?: number;
   reviewCount?: number;
+  feedbackCount?: number;
+  thumbsUpCount?: number;
 }
 
 interface LeaderboardData {
@@ -26,27 +28,34 @@ interface LeaderboardData {
 
 type Role = 'drivers' | 'passengers';
 
-const DRIVER_METRICS = [
-  { key: 'rides', label: 'Rides', icon: TrendingUp },
-  { key: 'earnings', label: 'Earnings', icon: Coins },
-  { key: 'rating', label: 'Rating', icon: Star },
+interface Metric {
+  key: string;
+  label: string;
+  icon: typeof TrendingUp;
+  description: string;
+}
+
+const DRIVER_METRICS: Metric[] = [
+  { key: 'rides', label: 'Rides', icon: TrendingUp, description: 'Total completed rides. Shows who\'s been the most active driver on the road.' },
+  { key: 'earnings', label: 'Earnings', icon: Coins, description: 'Total estimated earnings from completed rides. Based on final fares, not actual cash collected.' },
+  { key: 'rating', label: 'Rating', icon: Star, description: 'Average star rating given by passengers. Reflects overall service quality and customer satisfaction.' },
 ];
 
-const PASSENGER_METRICS = [
-  { key: 'rides', label: 'Rides', icon: TrendingUp },
-  { key: 'tips', label: 'Tips', icon: Heart },
-  { key: 'ratings', label: 'Avg Rating', icon: Star },
+const PASSENGER_METRICS: Metric[] = [
+  { key: 'rides', label: 'Rides', icon: TrendingUp, description: 'Total completed rides. Shows who\'s the most frequent rider in the city.' },
+  { key: 'tips', label: 'Tips', icon: Heart, description: 'Total platform tips given to support TriQ. Shows who\'s the most generous supporter.' },
+  { key: 'ratings', label: 'Approval', icon: Star, description: 'Driver thumbs-up approval rate. Percentage of drivers who gave a thumbs up after the ride. Higher = better passenger behavior.' },
 ];
 
 const PERIODS = [
-  { key: 'week', label: 'This Week' },
-  { key: 'month', label: 'This Month' },
-  { key: 'alltime', label: 'All Time' },
+  { key: 'week', label: 'This Week', description: 'Ranks based on activity in the last 7 days.' },
+  { key: 'month', label: 'This Month', description: 'Ranks based on activity in the last 30 days.' },
+  { key: 'alltime', label: 'All Time', description: 'Ranks based on all-time activity since the platform launched.' },
 ];
 
-const ROLE_TABS: { key: Role; label: string }[] = [
-  { key: 'drivers', label: 'Drivers' },
-  { key: 'passengers', label: 'Passengers' },
+const ROLE_TABS: { key: Role; label: string; description: string }[] = [
+  { key: 'drivers', label: 'Drivers', description: 'See which drivers are topping the charts in rides, earnings, and ratings.' },
+  { key: 'passengers', label: 'Passengers', description: 'See which passengers are the most active, generous, and well-regarded by drivers.' },
 ];
 
 export default function Leaderboard() {
@@ -76,7 +85,8 @@ export default function Leaderboard() {
 
   const formatScore = (score: number, metric: string) => {
     if (metric === 'earnings' || metric === 'tips') return `₱${(score / 100).toFixed(0)}`;
-    if (metric === 'rating' || metric === 'ratings') return score.toFixed(1);
+    if (metric === 'rating') return `${score.toFixed(1)}★`;
+    if (metric === 'ratings') return `${score}%`;
     return String(score);
   };
 
@@ -113,6 +123,7 @@ export default function Leaderboard() {
           </button>
         ))}
       </div>
+      <p className="text-xs text-gray-500 -mt-2">{ROLE_TABS.find((t) => t.key === role)?.description}</p>
 
       {/* Period tabs */}
       <div className="flex gap-2">
@@ -126,6 +137,7 @@ export default function Leaderboard() {
           </button>
         ))}
       </div>
+      <p className="text-xs text-gray-500 -mt-2">{PERIODS.find((p) => p.key === period)?.description}</p>
 
       {/* Metric tabs */}
       <div className="flex gap-2">
@@ -143,6 +155,7 @@ export default function Leaderboard() {
           );
         })}
       </div>
+      <p className="text-xs text-gray-500 -mt-2">{metrics.find((m) => m.key === metric)?.description}</p>
 
       {loading ? (
         <div className="flex items-center justify-center h-40">
@@ -210,6 +223,7 @@ export default function Leaderboard() {
                     )}
                     {e.tipCount !== undefined && <span>{e.tipCount} tips</span>}
                     {e.reviewCount !== undefined && <span>{e.reviewCount} reviews</span>}
+                    {e.feedbackCount !== undefined && <span>{e.thumbsUpCount}/{e.feedbackCount} thumbs up</span>}
                   </div>
                 </div>
                 <span className={`text-sm font-bold ${rankColors(e.rank)}`}>
