@@ -1,26 +1,39 @@
 import { useState, useEffect } from 'react';
+import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
-import { TrendingUp, Calendar, DollarSign } from 'lucide-react';
+import { TrendingUp, Calendar, DollarSign, Star, Info } from 'lucide-react';
 
 interface EarningsData {
-  totalEarnings: number;
+  today: { earnings: number; rides: number };
+  week: { earnings: number; rides: number };
+  month: { earnings: number; rides: number };
+  total: { earnings: number; rides: number };
+}
+
+interface DriverProfile {
+  rating: number;
   totalRides: number;
-  todayEarnings: number;
-  todayRides: number;
-  weekEarnings: number;
-  weekRides: number;
+  plateNumber: string;
+  tricycleModel: string | null;
 }
 
 export default function DriverEarnings() {
+  const { user } = useAuthStore();
   const [data, setData] = useState<EarningsData | null>(null);
+  const [profile, setProfile] = useState<DriverProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/drivers/earnings')
+    if (!user) return;
+    api.get('/drivers', { params: { userId: user.id } })
+      .then((res) => {
+        setProfile(res.data);
+        return api.get(`/drivers/${res.data.id}/earnings`);
+      })
       .then((res) => setData(res.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [user]);
 
   if (loading) {
     return (
@@ -33,14 +46,21 @@ export default function DriverEarnings() {
   const formatPeso = (centavos: number) => `₱${(centavos / 100).toLocaleString('en-PH', { maximumFractionDigits: 0 })}`;
 
   const cards = [
-    { label: 'Today', icon: Calendar, earnings: data?.todayEarnings || 0, rides: data?.todayRides || 0 },
-    { label: 'This Week', icon: TrendingUp, earnings: data?.weekEarnings || 0, rides: data?.weekRides || 0 },
-    { label: 'All Time', icon: DollarSign, earnings: data?.totalEarnings || 0, rides: data?.totalRides || 0 },
+    { label: 'Today', icon: Calendar, earnings: data?.today?.earnings || 0, rides: data?.today?.rides || 0 },
+    { label: 'This Week', icon: TrendingUp, earnings: data?.week?.earnings || 0, rides: data?.week?.rides || 0 },
+    { label: 'This Month', icon: DollarSign, earnings: data?.month?.earnings || 0, rides: data?.month?.rides || 0 },
+    { label: 'All Time', icon: Star, earnings: data?.total?.earnings || 0, rides: data?.total?.rides || 0 },
   ];
 
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-bold text-triq-yellow">Earnings</h2>
+
+      {/* Disclaimer banner */}
+      <div className="flex items-start gap-2 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+        <Info size={14} className="text-blue-400 mt-0.5 shrink-0" />
+        <p className="text-xs text-blue-300">Estimated fares shown. Actual cash collection may vary. Platform does not handle ride payments.</p>
+      </div>
 
       <div className="space-y-3">
         {cards.map((card) => {
@@ -57,6 +77,17 @@ export default function DriverEarnings() {
           );
         })}
       </div>
+
+      {/* Rating card */}
+      {profile && (
+        <div className="card p-4 flex items-center gap-4">
+          <Star size={28} className="text-triq-yellow" />
+          <div>
+            <p className="text-white font-bold text-lg">{profile.rating > 0 ? `${profile.rating.toFixed(1)} / 5.0` : 'No ratings yet'}</p>
+            <p className="text-xs text-gray-400">{profile.totalRides} total rides</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

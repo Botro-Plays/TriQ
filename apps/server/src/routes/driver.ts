@@ -239,33 +239,43 @@ router.get('/:id/rides', async (req, res) => {
 router.get('/:id/earnings', async (req, res) => {
   try {
     const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
 
-    const [monthRides, weekRides, totalRides] = await Promise.all([
+    const [todayRides, monthRides, weekRides, totalRides] = await Promise.all([
+      prisma.ride.aggregate({
+        where: { driverId: req.params.id, status: 'COMPLETED', completedAt: { gte: startOfToday } },
+        _sum: { finalFare: true, estimatedFare: true },
+        _count: true,
+      }),
       prisma.ride.aggregate({
         where: { driverId: req.params.id, status: 'COMPLETED', completedAt: { gte: startOfMonth } },
-        _sum: { finalFare: true },
+        _sum: { finalFare: true, estimatedFare: true },
         _count: true,
       }),
       prisma.ride.aggregate({
         where: { driverId: req.params.id, status: 'COMPLETED', completedAt: { gte: startOfWeek } },
-        _sum: { finalFare: true },
+        _sum: { finalFare: true, estimatedFare: true },
         _count: true,
       }),
       prisma.ride.aggregate({
         where: { driverId: req.params.id, status: 'COMPLETED' },
-        _sum: { finalFare: true },
+        _sum: { finalFare: true, estimatedFare: true },
         _count: true,
       }),
     ]);
 
+    // Use finalFare if available, otherwise fall back to estimatedFare
+    const pickFare = (agg: { _sum: { finalFare: number | null; estimatedFare: number | null } }) =>
+      agg._sum.finalFare ?? agg._sum.estimatedFare ?? 0;
+
     res.json({
-      today: { earnings: 0, rides: 0 },
-      week: { earnings: weekRides._sum.finalFare || 0, rides: weekRides._count },
-      month: { earnings: monthRides._sum.finalFare || 0, rides: monthRides._count },
-      total: { earnings: totalRides._sum.finalFare || 0, rides: totalRides._count },
+      today: { earnings: pickFare(todayRides), rides: todayRides._count },
+      week: { earnings: pickFare(weekRides), rides: weekRides._count },
+      month: { earnings: pickFare(monthRides), rides: monthRides._count },
+      total: { earnings: pickFare(totalRides), rides: totalRides._count },
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get earnings', message: err.message });
