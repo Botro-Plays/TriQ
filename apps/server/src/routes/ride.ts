@@ -86,6 +86,7 @@ router.post('/', async (req, res) => {
       hasSeniorCitizen = false,
       hasStudent = false,
       hasExtraBaggage = false,
+      driverTip = 0,
       paymentMethod = 'CASH',
     } = req.body;
 
@@ -106,7 +107,7 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    const estimatedFare = await calculateFare(pickupLat, pickupLng, dropoffLat, dropoffLng, passengerCount, hasSeniorCitizen, hasStudent, hasExtraBaggage);
+    const estimatedFare = await calculateFare(pickupLat, pickupLng, dropoffLat, dropoffLng, passengerCount, hasSeniorCitizen, hasStudent, hasExtraBaggage) + driverTip;
 
     const ride = await prisma.ride.create({
       data: {

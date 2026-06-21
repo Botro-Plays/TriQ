@@ -3,7 +3,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
 import { getCurrentLocation, type GeoError } from '../../lib/geolocation';
-import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X, TrendingUp, Search, Heart } from 'lucide-react';
+import { Crosshair, MapPin, Navigation, Users, Backpack, GraduationCap, Accessibility, X, TrendingUp, Search, Plus } from 'lucide-react';
 
 const DIGOS_CENTER: [number, number] = [6.7500, 125.3573];
 
@@ -46,8 +46,8 @@ export default function PassengerHome() {
   const [geoError, setGeoError] = useState('');
   const [fareEstimate, setFareEstimate] = useState<{ estimatedFare: number; perPersonFare: number; discountedPerPersonFare: number; distanceKm: number; discountApplied: boolean; baggageFee: number } | null>(null);
   const [estimating, setEstimating] = useState(false);
-  const [tipAmount, setTipAmount] = useState(0);
   const [dropoffQuery, setDropoffQuery] = useState('');
+  const [driverTip, setDriverTip] = useState(0);
   const [searchResults, setSearchResults] = useState<{ lat: number; lng: number; display_name: string }[]>([]);
   const [searching, setSearching] = useState(false);
 
@@ -184,6 +184,7 @@ export default function PassengerHome() {
         hasSeniorCitizen: seniorCount > 0,
         hasStudent: studentCount > 0,
         hasExtraBaggage,
+        driverTip,
       });
       setStep('searching');
     } catch (err: any) {
@@ -454,7 +455,7 @@ export default function PassengerHome() {
                 {estimating ? (
                   <span className="inline-block w-4 h-4 border-2 border-triq-cyan/30 border-t-triq-cyan rounded-full animate-spin" />
                 ) : fareEstimate ? (
-                  <span className="text-triq-yellow font-bold text-xl">₱{((fareEstimate.estimatedFare + tipAmount) / 100).toFixed(0)}</span>
+                  <span className="text-triq-yellow font-bold text-xl">₱{((fareEstimate.estimatedFare + driverTip) / 100).toFixed(0)}</span>
                 ) : (
                   <span className="text-gray-500 text-sm">—</span>
                 )}
@@ -476,38 +477,35 @@ export default function PassengerHome() {
                         <span>₱{(fareEstimate.baggageFee / 100).toFixed(0)}</span>
                       </div>
                     )}
-                    {tipAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span>Tip</span>
-                        <span>₱{(tipAmount / 100).toFixed(0)}</span>
-                      </div>
-                    )}
                     {fareEstimate.discountApplied && (
                       <p className="text-green-400 text-[11px] mt-1">20% LGU discount applied to qualifying passengers</p>
                     )}
                   </div>
 
-                  {/* Tip buttons */}
+                  {/* Driver tip buttons */}
                   <div className="mt-3 pt-3 border-t border-triq-light/10">
                     <div className="flex items-center gap-1.5 mb-2">
-                      <Heart size={12} className="text-triq-cyan" />
-                      <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Support TriQ (optional)</span>
+                      <Plus size={12} className="text-triq-cyan" />
+                      <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Add extra for driver (optional)</span>
                     </div>
                     <div className="flex gap-1.5 flex-wrap">
                       {[0, 100, 200, 500, 1000, 1500, 2000].map((amt) => (
                         <button
                           key={amt}
-                          onClick={() => setTipAmount(amt)}
+                          onClick={() => setDriverTip(amt)}
                           className={`px-2.5 h-8 rounded-lg text-xs font-medium transition-all active:scale-90 ${
-                            tipAmount === amt
+                            driverTip === amt
                               ? 'bg-triq-cyan text-triq-dark'
                               : 'bg-triq-light/10 text-gray-400 hover:bg-triq-light/20'
                           }`}
                         >
-                          {amt === 0 ? 'None' : `₱${(amt / 100).toFixed(0)}`}
+                          {amt === 0 ? 'None' : `+₱${(amt / 100).toFixed(0)}`}
                         </button>
                       ))}
                     </div>
+                    {driverTip > 0 && (
+                      <p className="text-[11px] text-gray-500 mt-1.5">Added to driver's fare</p>
+                    )}
                   </div>
                 </>
               )}
@@ -541,7 +539,7 @@ export default function PassengerHome() {
               <>
                 Request Ride
                 {fareEstimate && !loading && (
-                  <span className="text-sm opacity-80">· ₱{((fareEstimate.estimatedFare + tipAmount) / 100).toFixed(0)}</span>
+                  <span className="text-sm opacity-80">· ₱{((fareEstimate.estimatedFare + driverTip) / 100).toFixed(0)}</span>
                 )}
               </>
             )}
