@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
-import { ShieldAlert, AlertTriangle, Settings, X, ThumbsUp, ThumbsDown, MessageSquare, CheckCircle, XCircle } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Settings, X, ThumbsUp, ThumbsDown, MessageSquare, CheckCircle, XCircle, Phone, MapPin } from 'lucide-react';
 
 type Tab = 'strikes' | 'emergencies' | 'config' | 'thumbs' | 'feedback';
 
@@ -21,13 +21,15 @@ interface Emergency {
   lat: number | null;
   lng: number | null;
   notes: string | null;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
   createdAt: string;
   ride: {
     id: string;
     pickupAddress: string;
     dropoffAddress: string;
-    passenger: { name: string };
-    driver: { name: string; plateNumber: string } | null;
+    passenger: { name: string; user: { phoneNumber: string | null } };
+    driver: { name: string; plateNumber: string; user: { phoneNumber: string | null } } | null;
   };
 }
 
@@ -236,28 +238,70 @@ export default function AdminMore() {
         ) : (
           <div className="space-y-2">
             {emergencies.map((e) => (
-              <div key={e.id} className={`card p-3 space-y-2 ${e.status === 'ACTIVE' ? 'border-red-500/30' : ''}`}>
+              <div key={e.id} className={`card p-3 space-y-2 ${e.status === 'ACTIVE' ? 'border border-red-500/40' : ''}`}>
                 <div className="flex items-center justify-between">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                    e.status === 'ACTIVE' ? 'bg-red-500/20 text-red-400' :
-                    e.status === 'RESOLVED' ? 'bg-green-500/20 text-green-400' :
-                    'bg-gray-500/20 text-gray-400'
-                  }`}>{e.status}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                      e.status === 'ACTIVE' ? 'bg-red-500/20 text-red-400' :
+                      e.status === 'RESOLVED' ? 'bg-green-500/20 text-green-400' :
+                      'bg-gray-500/20 text-gray-400'
+                    }`}>{e.status}</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 font-medium">{e.alertType}</span>
+                  </div>
                   <span className="text-xs text-gray-500">{formatDate(e.createdAt)}</span>
                 </div>
-                <div className="text-xs text-gray-400">
-                  {e.ride.passenger.name} · {e.ride.driver?.name || 'No driver'}
+
+                {/* Contact info */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-300">🧍 {e.ride.passenger.name}</span>
+                    {e.ride.passenger.user.phoneNumber && (
+                      <a href={`tel:${e.ride.passenger.user.phoneNumber}`}
+                        className="flex items-center gap-1 text-xs text-triq-cyan">
+                        <Phone size={11} /> {e.ride.passenger.user.phoneNumber}
+                      </a>
+                    )}
+                  </div>
+                  {e.ride.driver && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-300">🛺 {e.ride.driver.name} ({e.ride.driver.plateNumber})</span>
+                      {e.ride.driver.user.phoneNumber && (
+                        <a href={`tel:${e.ride.driver.user.phoneNumber}`}
+                          className="flex items-center gap-1 text-xs text-triq-cyan">
+                          <Phone size={11} /> {e.ride.driver.user.phoneNumber}
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
+
                 <div className="text-xs text-gray-500 truncate">
-                  {e.ride.pickupAddress} → {e.ride.dropoffAddress}
+                  📍 {e.ride.pickupAddress} → {e.ride.dropoffAddress}
                 </div>
-                {e.notes && <p className="text-xs text-gray-300 italic">"{e.notes}"</p>}
+
+                {/* Map link if coordinates known */}
+                {e.lat && e.lng && (
+                  <a
+                    href={`https://maps.google.com/?q=${e.lat},${e.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-triq-yellow"
+                  >
+                    <MapPin size={11} /> View on Google Maps ({e.lat.toFixed(5)}, {e.lng.toFixed(5)})
+                  </a>
+                )}
+
+                {e.notes && <p className="text-xs text-gray-300 italic border-t border-triq-light/10 pt-1">"{e.notes}"</p>}
+                {e.resolvedBy && (
+                  <p className="text-xs text-gray-500">Resolved by {e.resolvedBy} · {e.resolvedAt ? formatDate(e.resolvedAt) : ''}</p>
+                )}
+
                 {e.status === 'ACTIVE' && (
                   <button
                     onClick={() => { setResolveModal(e); setResolveNotes(''); }}
                     className="w-full h-8 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 text-xs font-medium"
                   >
-                    Mark Resolved
+                    Take Action / Mark Resolved
                   </button>
                 )}
               </div>
@@ -424,23 +468,67 @@ export default function AdminMore() {
               <h3 className="text-lg font-bold text-white">Resolve Emergency</h3>
               <button onClick={() => setResolveModal(null)} className="text-gray-400 hover:text-white"><X size={18} /></button>
             </div>
-            <p className="text-sm text-gray-400">
-              {resolveModal.ride.passenger.name} · {resolveModal.ride.driver?.name || 'No driver'}
-            </p>
+            <div className="space-y-1 text-sm">
+              <p className="text-gray-300">🧍 {resolveModal.ride.passenger.name}
+                {resolveModal.ride.passenger.user.phoneNumber && (
+                  <a href={`tel:${resolveModal.ride.passenger.user.phoneNumber}`} className="ml-2 text-triq-cyan">
+                    <Phone size={12} className="inline" /> {resolveModal.ride.passenger.user.phoneNumber}
+                  </a>
+                )}
+              </p>
+              {resolveModal.ride.driver && (
+                <p className="text-gray-300">🛺 {resolveModal.ride.driver.name} ({resolveModal.ride.driver.plateNumber})
+                  {resolveModal.ride.driver.user.phoneNumber && (
+                    <a href={`tel:${resolveModal.ride.driver.user.phoneNumber}`} className="ml-2 text-triq-cyan">
+                      <Phone size={12} className="inline" /> {resolveModal.ride.driver.user.phoneNumber}
+                    </a>
+                  )}
+                </p>
+              )}
+              {resolveModal.lat && resolveModal.lng && (
+                <a
+                  href={`https://maps.google.com/?q=${resolveModal.lat},${resolveModal.lng}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-triq-yellow text-xs"
+                >
+                  <MapPin size={11} /> View location on Google Maps
+                </a>
+              )}
+            </div>
             <textarea
               value={resolveNotes}
               onChange={(e) => setResolveNotes(e.target.value)}
-              placeholder="Resolution notes (optional)"
+              placeholder="Resolution notes (e.g. 'Contacted police', 'False alarm confirmed by passenger')"
               rows={3}
               className="w-full px-3 py-2 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm resize-none"
             />
-            <button
-              onClick={resolveEmergency}
-              disabled={actionLoading === resolveModal?.id}
-              className="w-full h-10 rounded-lg bg-green-500 text-white font-bold text-sm disabled:opacity-40"
-            >
-              {actionLoading === resolveModal?.id ? 'Resolving…' : 'Mark Resolved'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={resolveEmergency}
+                disabled={actionLoading === resolveModal?.id}
+                className="flex-1 h-10 rounded-lg bg-green-500 text-white font-bold text-sm disabled:opacity-40"
+              >
+                {actionLoading === resolveModal?.id ? 'Saving…' : '✅ Mark Resolved'}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!resolveModal) return;
+                  setActionLoading(resolveModal.id);
+                  try {
+                    await api.patch(`/admin/emergencies/${resolveModal.id}/resolve`, { notes: resolveNotes, status: 'FALSE_ALARM' });
+                    setEmergencies((prev) => prev.map((e) => e.id === resolveModal.id ? { ...e, status: 'FALSE_ALARM', notes: resolveNotes } : e));
+                    setResolveModal(null); setResolveNotes('');
+                    showToast('success', 'Marked as false alarm');
+                  } catch (err: any) {
+                    showToast('error', err?.response?.data?.error || 'Failed');
+                  } finally { setActionLoading(null); }
+                }}
+                disabled={actionLoading === resolveModal?.id}
+                className="flex-1 h-10 rounded-lg bg-gray-500/20 text-gray-300 border border-gray-500/30 font-bold text-sm disabled:opacity-40"
+              >
+                🚫 False Alarm
+              </button>
+            </div>
           </div>
         </div>
       )}

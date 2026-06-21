@@ -163,8 +163,8 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(ride);
 
-    // Push notification: notify preferred driver on rebook, else skip (Socket.io handles broadcast)
     if (preferredDriverId) {
+      // Rebook: notify the preferred driver only
       const prefDriver = await prisma.driver.findUnique({
         where: { id: preferredDriverId },
         select: { fcmToken: true, name: true } as any,
@@ -175,6 +175,35 @@ router.post('/', async (req, res) => {
           body: `${ride.passenger.name} is requesting you specifically. Tap to view.`,
           data: { rideId: ride.id, type: 'REBOOK' },
         });
+      }
+    } else {
+      // Regular booking: push notify all online PRO/ELITE drivers within pickup radius
+      const vipDrivers = await (prisma.driver as any).findMany({
+        where: {
+          isOnline: true,
+          status: 'VERIFIED',
+          subscriptionStatus: 'ACTIVE',
+          subscriptionTier: { in: ['PRO', 'ELITE'] },
+          currentLat: { not: null },
+          currentLng: { not: null },
+          fcmToken: { not: null },
+        },
+        select: { id: true, name: true, fcmToken: true, currentLat: true, currentLng: true, pickupRadius: true, subscriptionTier: true },
+      });
+
+      const pickupLat = ride.pickupLat;
+      const pickupLng = ride.pickupLng;
+
+      for (const drv of vipDrivers) {
+        const dist = haversine(pickupLat, pickupLng, drv.currentLat, drv.currentLng);
+        const effectiveRadius = drv.subscriptionTier === 'ELITE' ? drv.pickupRadius * 1.2 : drv.pickupRadius;
+        if (dist <= effectiveRadius) {
+          await sendPush(drv.fcmToken, {
+            title: '🛺 New Ride Request!',
+            body: `Pickup: ${ride.pickupAddress} — ${(dist).toFixed(1)} km away. Fare: ₱${(ride.estimatedFare / 100).toFixed(0)}`,
+            data: { rideId: ride.id, type: 'NEW_RIDE' },
+          });
+        }
       }
     }
   } catch (err: any) {

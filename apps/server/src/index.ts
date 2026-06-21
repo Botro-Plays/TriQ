@@ -30,6 +30,7 @@ import { authMiddleware, requireRole } from './middleware/auth';
 import { logger } from './lib/logger';
 import { seedDatabase } from './lib/seed';
 import { startRideCron } from './lib/rideCron';
+import { initFirebaseAdmin } from './lib/firebaseAdmin';
 
 // Routes
 import authRoutes from './routes/auth';
@@ -131,6 +132,7 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
     // Continue starting server — don't block startup on seed errors
   }
 
+  initFirebaseAdmin();
   startRideCron();
 
   httpServer.listen(PORT, '0.0.0.0', () => {

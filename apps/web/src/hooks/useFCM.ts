@@ -21,32 +21,55 @@ export function useFCM() {
 
     const register = async () => {
       try {
+        console.log('[FCM] Requesting notification permission...');
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
+        console.log('[FCM] Permission:', permission);
+        if (permission !== 'granted') {
+          console.warn('[FCM] Notification permission denied — push will not work');
+          return;
+        }
 
         // Register FCM service worker at root scope so it receives push events for all app pages
+        console.log('[FCM] Registering service worker...');
         const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        await registration.update();
+        console.log('[FCM] Service worker registered, scope:', registration.scope);
 
         const messaging = getMessaging(app);
+        console.log('[FCM] Getting FCM token with VAPID key...');
         const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
-        if (!token || cancelled) return;
+        if (!token || cancelled) {
+          console.warn('[FCM] No token returned — check VAPID key and Firebase config');
+          return;
+        }
+        console.log('[FCM] Token obtained, saving to server for role:', role);
 
         // Save token to server based on user role
         if (role === 'DRIVER') {
           const driverRes = await api.get('/drivers', { params: { userId: user.id } });
           const driverId = driverRes.data?.id;
-          if (driverId) await api.patch(`/drivers/${driverId}/fcm-token`, { fcmToken: token });
+          if (driverId) {
+            await api.patch(`/drivers/${driverId}/fcm-token`, { fcmToken: token });
+            console.log('[FCM] Driver token saved, driverId:', driverId);
+          } else {
+            console.warn('[FCM] Could not find driverId for userId:', user.id);
+          }
         } else if (role === 'PASSENGER') {
           const passRes = await api.get('/passengers', { params: { userId: user.id } });
           const passengerId = passRes.data?.id;
-          if (passengerId) await api.patch(`/passengers/${passengerId}/fcm-token`, { fcmToken: token });
+          if (passengerId) {
+            await api.patch(`/passengers/${passengerId}/fcm-token`, { fcmToken: token });
+            console.log('[FCM] Passenger token saved, passengerId:', passengerId);
+          } else {
+            console.warn('[FCM] Could not find passengerId for userId:', user.id);
+          }
         }
 
         // Handle foreground messages (app is in focus — show in-app toast or browser notification)
         onMessage(messaging, (payload) => {
+          console.log('[FCM] Foreground message received:', payload.notification?.title);
           const title = payload.notification?.title || 'TriQ';
           const body = payload.notification?.body || '';
-          // Show native notification even when in foreground
           if (Notification.permission === 'granted') {
             new Notification(title, {
               body,
@@ -55,8 +78,10 @@ export function useFCM() {
             });
           }
         });
+
+        console.log('[FCM] Setup complete ✓');
       } catch (err) {
-        console.warn('[FCM] Registration failed:', err);
+        console.error('[FCM] Registration failed:', err);
       }
     };
 

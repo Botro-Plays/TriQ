@@ -544,7 +544,15 @@ router.get('/emergencies', async (req, res) => {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          ride: { select: { id: true, pickupAddress: true, dropoffAddress: true, passenger: { select: { name: true } }, driver: { select: { name: true, plateNumber: true } } } },
+          ride: {
+            select: {
+              id: true,
+              pickupAddress: true,
+              dropoffAddress: true,
+              passenger: { select: { name: true, user: { select: { phoneNumber: true } } } },
+              driver: { select: { name: true, plateNumber: true, user: { select: { phoneNumber: true } } } },
+            },
+          },
         },
       }),
       prisma.emergencyEvent.count(),

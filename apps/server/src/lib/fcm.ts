@@ -1,4 +1,4 @@
-import { admin } from './firebaseAdmin';
+import { admin, isFirebaseAdminInitialized } from './firebaseAdmin';
 
 export interface NotificationPayload {
   title: string;
@@ -12,6 +12,10 @@ export interface NotificationPayload {
  */
 export async function sendPush(fcmToken: string | null | undefined, payload: NotificationPayload): Promise<void> {
   if (!fcmToken) return;
+  if (!isFirebaseAdminInitialized()) {
+    console.warn('[FCM] sendPush skipped — Firebase Admin not initialized. Set FIREBASE_SERVICE_ACCOUNT_JSON env var.');
+    return;
+  }
   try {
     await admin.messaging().send({
       token: fcmToken,
