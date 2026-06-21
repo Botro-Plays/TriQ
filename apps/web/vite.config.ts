@@ -17,8 +17,8 @@ export default defineConfig({
       manifest: {
         name: 'TriQ — Tricycle Booking',
         short_name: 'TriQ',
-        theme_color: '#0F172A',
-        background_color: '#F8FAFC',
+        theme_color: '#0B1120',
+        background_color: '#0B1120',
         display: 'standalone',
         scope: '/',
         start_url: '/',

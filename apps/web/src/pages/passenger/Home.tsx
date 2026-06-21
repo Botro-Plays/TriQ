@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
+import { getCurrentLocation, type GeoError } from '../../lib/geolocation';
+import { Crosshair } from 'lucide-react';
 
 const DIGOS_CENTER: [number, number] = [6.7500, 125.3573];
 
@@ -95,13 +97,22 @@ export default function PassengerHome() {
     }
   };
 
-  const useMyLocation = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const { latitude, longitude } = pos.coords;
-      setPickup({ lat: latitude, lng: longitude, address: 'Current location' });
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState('');
+
+  const useMyLocation = async () => {
+    setLocating(true);
+    setGeoError('');
+    try {
+      const pos = await getCurrentLocation();
+      setPickup({ lat: pos.lat, lng: pos.lng, address: 'Current location' });
       setSelecting(null);
-    });
+    } catch (err) {
+      const geoErr = err as GeoError;
+      setGeoError(geoErr.message);
+    } finally {
+      setLocating(false);
+    }
   };
 
   const requestRide = async () => {
@@ -195,8 +206,14 @@ export default function PassengerHome() {
                 </button>
                 <button
                   onClick={useMyLocation}
-                  className="px-3 h-10 rounded-lg text-sm font-medium bg-triq-light/10 text-gray-300 hover:bg-triq-light/20"
+                  disabled={locating}
+                  className="px-3 h-10 rounded-lg text-sm font-medium bg-triq-light/10 text-gray-300 hover:bg-triq-light/20 disabled:opacity-40 flex items-center gap-1.5"
                 >
+                  {locating ? (
+                    <span className="inline-block w-3.5 h-3.5 border-2 border-triq-cyan/30 border-t-triq-cyan rounded-full animate-spin" />
+                  ) : (
+                    <Crosshair size={14} />
+                  )}
                   GPS
                 </button>
               </div>
@@ -238,6 +255,12 @@ export default function PassengerHome() {
               </select>
             </div>
           </div>
+
+          {geoError && (
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg px-3 py-2">
+              <p className="text-orange-400 text-xs">{geoError}</p>
+            </div>
+          )}
 
           {selecting && (
             <div className="bg-triq-cyan/10 border border-triq-cyan/30 rounded-lg px-3 py-2 text-sm text-triq-cyan">

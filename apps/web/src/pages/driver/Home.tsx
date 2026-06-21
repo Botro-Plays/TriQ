@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import MapView from '../../components/MapView';
+import { getCurrentLocation, watchLocation, clearWatch, type GeoError } from '../../lib/geolocation';
 
 const DIGOS_CENTER: [number, number] = [6.7500, 125.3573];
 
@@ -74,53 +75,57 @@ export default function DriverHome() {
     return () => clearInterval(interval);
   }, [driverId]);
 
-  const goOnline = () => {
-    if (!navigator.geolocation || !driverId) return;
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const { latitude, longitude } = pos.coords;
-      setLocation({ lat: latitude, lng: longitude });
-      try {
-        await api.patch(`/drivers/${driverId}/online`, { lat: latitude, lng: longitude });
-        setIsOnline(true);
+  const goOnline = async () => {
+    if (!driverId) return;
+    try {
+      const pos = await getCurrentLocation();
+      setLocation({ lat: pos.lat, lng: pos.lng });
+      await api.patch(`/drivers/${driverId}/online`, { lat: pos.lat, lng: pos.lng });
+      setIsOnline(true);
 
-        // Start watching position
-        watchIdRef.current = navigator.geolocation.watchPosition((p) => {
-          setLocation({ lat: p.coords.latitude, lng: p.coords.longitude });
-        });
+      // Start watching position
+      const watchId = watchLocation(
+        (p) => {
+          setLocation({ lat: p.lat, lng: p.lng });
+        },
+        (err: GeoError) => {
+          if (err.code === 'PERMISSION_DENIED') {
+            setError('Location permission was denied. Please enable location services to stay online.');
+            goOffline();
+          }
+        }
+      );
+      watchIdRef.current = watchId;
 
-        // Send location updates every 15s
-        locationIntervalRef.current = setInterval(async () => {
-          try {
-            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject);
-            });
-            await api.patch(`/drivers/${driverId}/location`, {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-            });
-          } catch {}
-        }, 15000);
-      } catch (err: any) {
-        setError(err.response?.data?.error || 'Failed to go online');
-      }
-    });
+      // Send location updates every 15s
+      locationIntervalRef.current = setInterval(async () => {
+        try {
+          const pos = await getCurrentLocation();
+          await api.patch(`/drivers/${driverId}/location`, {
+            lat: pos.lat,
+            lng: pos.lng,
+          });
+        } catch {}
+      }, 15000);
+    } catch (err) {
+      const geoErr = err as GeoError;
+      setError(geoErr.message);
+    }
   };
 
   const goOffline = async () => {
     if (!driverId) return;
     try {
       await api.patch(`/drivers/${driverId}/offline`);
-      setIsOnline(false);
-      setPendingRides([]);
-      if (watchIdRef.current) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-      if (locationIntervalRef.current) {
-        clearInterval(locationIntervalRef.current);
-        locationIntervalRef.current = null;
-      }
     } catch {}
+    setIsOnline(false);
+    setPendingRides([]);
+    clearWatch(watchIdRef.current);
+    watchIdRef.current = null;
+    if (locationIntervalRef.current) {
+      clearInterval(locationIntervalRef.current);
+      locationIntervalRef.current = null;
+    }
   };
 
   // Fetch pending rides when online and no active ride
