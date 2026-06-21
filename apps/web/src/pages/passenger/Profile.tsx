@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
-import { Phone, Shield, Award, Zap, X, MapPin } from 'lucide-react';
+import { Phone, Shield, Award, Zap, X, MapPin, Heart } from 'lucide-react';
+import TipModal from '../../components/TipModal';
 
 interface PassengerData {
   id: string;
@@ -48,6 +49,7 @@ export default function PassengerProfile() {
   const [showKycForm, setShowKycForm] = useState(false);
   const [docType, setDocType] = useState('');
   const [docUrl, setDocUrl] = useState('');
+  const [showTipModal, setShowTipModal] = useState(false);
   const [selfieUrl, setSelfieUrl] = useState('');
   const [submittingKyc, setSubmittingKyc] = useState(false);
 
@@ -247,6 +249,24 @@ export default function PassengerProfile() {
           </div>
         </div>
       )}
+
+      {/* Support TriQ */}
+      <div className="card p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Heart size={18} className="text-triq-cyan" />
+          <h3 className="text-sm font-semibold text-white">Support TriQ</h3>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">Enjoying TriQ? Show your support with a small tip to help keep the platform running.</p>
+        <button
+          onClick={() => setShowTipModal(true)}
+          className="w-full h-10 rounded-lg bg-triq-cyan/10 text-triq-cyan border border-triq-cyan/30 text-sm font-semibold flex items-center justify-center gap-2 hover:bg-triq-cyan/20 transition-colors"
+        >
+          <Heart size={15} />
+          Tip Platform
+        </button>
+      </div>
+
+      <TipModal open={showTipModal} onClose={() => setShowTipModal(false)} />
     </div>
   );
 }
