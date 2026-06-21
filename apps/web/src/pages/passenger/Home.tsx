@@ -91,7 +91,7 @@ export default function PassengerHome() {
   const fetchNearby = useCallback(async () => {
     if (!pickup) return;
     try {
-      const { data } = await api.get('/drivers/nearby', { params: { lat: pickup.lat, lng: pickup.lng, radius: 3 } });
+      const { data } = await api.get('/drivers/nearby', { params: { lat: pickup.lat, lng: pickup.lng, radius: 2.5 } });
       setNearbyDrivers(data.drivers);
     } catch {}
   }, [pickup]);
@@ -213,10 +213,10 @@ export default function PassengerHome() {
   };
 
   const mapMarkers = [
-    ...(pickup ? [{ id: 'pickup', lat: pickup.lat, lng: pickup.lng, icon: 'pickup' as const, label: 'A' }] : []),
+    ...(pickup ? [{ id: 'pickup', lat: pickup.lat, lng: pickup.lng, icon: 'passenger' as const, label: 'A' }] : []),
     ...(dropoff ? [{ id: 'dropoff', lat: dropoff.lat, lng: dropoff.lng, icon: 'dropoff' as const, label: 'B' }] : []),
-    ...nearbyDrivers.map((d) => ({ id: d.id, lat: d.currentLat, lng: d.currentLng, icon: 'driver' as const })),
-    ...(activeRide?.driver?.currentLat ? [{ id: 'active-driver', lat: activeRide.driver.currentLat, lng: activeRide.driver.currentLng!, icon: 'driver' as const }] : []),
+    ...nearbyDrivers.map((d) => ({ id: d.id, lat: d.currentLat, lng: d.currentLng, icon: 'tricycle' as const })),
+    ...(activeRide?.driver?.currentLat ? [{ id: 'active-driver', lat: activeRide.driver.currentLat, lng: activeRide.driver.currentLng!, icon: 'tricycle' as const }] : []),
   ];
 
   const mapCenter: [number, number] = pickup ? [pickup.lat, pickup.lng] : DIGOS_CENTER;

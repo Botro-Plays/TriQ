@@ -36,6 +36,7 @@ interface ActiveRide {
   estimatedFare: number;
   counterOfferedFare: number | null;
   counterOfferExpiresAt: string | null;
+  negotiatedFare: number | null;
   passenger: { id: string; name: string; user: { phoneNumber: string } };
 }
 
@@ -149,6 +150,19 @@ export default function DriverHome() {
     }
   };
 
+  const updateLocation = async () => {
+    try {
+      const pos = await getCurrentLocation();
+      setLocation({ lat: pos.lat, lng: pos.lng });
+      if (driverId) {
+        await api.patch(`/drivers/${driverId}/location`, { lat: pos.lat, lng: pos.lng });
+      }
+    } catch (err) {
+      const geoErr = err as GeoError;
+      setError(geoErr.message);
+    }
+  };
+
   // Track location in ref so pending rides interval doesn't reset on every GPS update
   const locationRef = useRef(location);
   locationRef.current = location;
@@ -161,7 +175,7 @@ export default function DriverHome() {
         const loc = locationRef.current;
         if (!loc) return;
         const { data } = await api.get('/rides/pending', {
-          params: { lat: loc.lat, lng: loc.lng, radius: 5 },
+          params: { lat: loc.lat, lng: loc.lng, radius: 2.5 },
         });
         setPendingRides(data.rides || []);
       } catch {
@@ -232,9 +246,12 @@ export default function DriverHome() {
   };
 
   const mapMarkers = [
-    ...(location ? [{ id: 'me', lat: location.lat, lng: location.lng, icon: 'driver' as const }] : []),
-    ...pendingRides.slice(0, 5).map((r) => ({
-      id: r.id, lat: r.pickupLat, lng: r.pickupLng, icon: 'pickup' as const, label: 'A' })),
+    ...(location ? [{ id: 'me', lat: location.lat, lng: location.lng, icon: 'tricycle' as const }] : []),
+    ...(activeRide ? [
+      { id: 'pickup', lat: activeRide.pickupLat, lng: activeRide.pickupLng, icon: 'pickup' as const, label: 'A' },
+      { id: 'dropoff', lat: activeRide.dropoffLat, lng: activeRide.dropoffLng, icon: 'dropoff' as const, label: 'B' },
+    ] : pendingRides.slice(0, 5).map((r) => ({
+      id: r.id, lat: r.pickupLat, lng: r.pickupLng, icon: 'pickup' as const, label: 'A' }))),
   ];
 
   // Calculate pickup distance for each pending ride
@@ -253,14 +270,24 @@ export default function DriverHome() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-triq-yellow">Driver Dashboard</h2>
-        <button
-          onClick={isOnline ? goOffline : goOnline}
-          className={`px-4 h-9 rounded-lg text-sm font-bold ${
-            isOnline ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
-          }`}
-        >
-          {isOnline ? '● Online' : '○ Offline'}
-        </button>
+        <div className="flex items-center gap-2">
+          {isOnline && (
+            <button
+              onClick={updateLocation}
+              className="px-3 h-9 rounded-lg text-sm font-bold bg-triq-cyan/20 text-triq-cyan border border-triq-cyan/30 active:scale-[0.97]"
+            >
+              📍 Update Location
+            </button>
+          )}
+          <button
+            onClick={isOnline ? goOffline : goOnline}
+            className={`px-4 h-9 rounded-lg text-sm font-bold ${
+              isOnline ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+            }`}
+          >
+            {isOnline ? '● Online' : '○ Offline'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -340,7 +367,14 @@ export default function DriverHome() {
               <p className="text-white font-semibold text-sm">{activeRide.passenger.name}</p>
               <p className="text-gray-400 text-xs">{activeRide.passenger.user.phoneNumber}</p>
             </div>
-            <span className="text-triq-yellow font-bold">₱{(activeRide.estimatedFare / 100).toFixed(0)}</span>
+            {activeRide.negotiatedFare ? (
+              <div className="text-right">
+                <span className="text-gray-500 line-through text-xs">₱{(activeRide.estimatedFare / 100).toFixed(0)}</span>
+                <span className="text-triq-yellow font-bold ml-1">₱{(activeRide.negotiatedFare / 100).toFixed(0)}</span>
+              </div>
+            ) : (
+              <span className="text-triq-yellow font-bold">₱{(activeRide.estimatedFare / 100).toFixed(0)}</span>
+            )}
           </div>
 
           <div className="flex gap-2">

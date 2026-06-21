@@ -15,7 +15,7 @@ interface MapMarker {
   lat: number;
   lng: number;
   label?: string;
-  icon?: 'default' | 'pickup' | 'dropoff' | 'driver';
+  icon?: 'default' | 'pickup' | 'dropoff' | 'driver' | 'tricycle' | 'passenger';
 }
 
 interface MapViewProps {
@@ -32,13 +32,27 @@ const iconColors: Record<string, string> = {
   dropoff: '#ef4444',
   driver: '#3b82f6',
   default: '#eab308',
+  tricycle: '#f59e0b',
+  passenger: '#3b82f6',
 };
 
-function createDivIcon(color: string, label?: string) {
-  const html = label
+const tricycleSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M7 17h10"/><path d="M7 17l3-6h7l3 6"/><path d="M10 11l1-4h3"/></svg>`;
+
+const personSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="0"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0z"/></svg>`;
+
+function createDivIcon(color: string, label?: string, iconType?: string) {
+  let innerHtml: string;
+  if (iconType === 'tricycle') {
+    innerHtml = `<div style="background:${color};width:32px;height:32px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">${tricycleSvg}</div>`;
+    return L.divIcon({ html: innerHtml, className: 'triq-marker', iconSize: [32, 32], iconAnchor: [16, 16] });
+  } else if (iconType === 'passenger') {
+    innerHtml = `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">${personSvg}</div>`;
+    return L.divIcon({ html: innerHtml, className: 'triq-marker', iconSize: [28, 28], iconAnchor: [14, 14] });
+  }
+  innerHtml = label
     ? `<div style="background:${color};width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:white;font-size:10px;font-weight:bold;">${label}</span></div>`
     : `<div style="background:${color};width:20px;height:20px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`;
-  return L.divIcon({ html, className: 'triq-marker', iconSize: [28, 28], iconAnchor: [14, 28] });
+  return L.divIcon({ html: innerHtml, className: 'triq-marker', iconSize: [28, 28], iconAnchor: [14, 28] });
 }
 
 export default function MapView({
@@ -93,8 +107,9 @@ export default function MapView({
 
     // Add new markers
     markers.forEach((m) => {
-      const color = iconColors[m.icon || 'default'] || iconColors.default;
-      const marker = L.marker([m.lat, m.lng], { icon: createDivIcon(color, m.label) }).addTo(map);
+      const iconType = m.icon || 'default';
+      const color = iconColors[iconType] || iconColors.default;
+      const marker = L.marker([m.lat, m.lng], { icon: createDivIcon(color, m.label, iconType) }).addTo(map);
       markersRef.current[m.id] = marker;
     });
 
