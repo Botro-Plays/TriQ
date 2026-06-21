@@ -742,4 +742,55 @@ router.get('/passenger-feedback', async (req, res) => {
   }
 });
 
+// GET /api/v1/admin/paymongo — get PayMongo config (masked)
+router.get('/paymongo', async (_req, res) => {
+  try {
+    const configs = await prisma.systemConfig.findMany({
+      where: { key: { startsWith: 'PAYMONGO_' } },
+    });
+    const map: Record<string, string> = {};
+    for (const c of configs) map[c.key] = c.value;
+
+    const mask = (v: string | undefined) => {
+      if (!v) return '';
+      if (v.length <= 8) return '****';
+      return v.slice(0, 4) + '****' + v.slice(-4);
+    };
+
+    res.json({
+      secretKey: mask(map.PAYMONGO_SECRET_KEY),
+      publicKey: mask(map.PAYMONGO_PUBLIC_KEY),
+      webhookSecret: map.PAYMONGO_WEBHOOK_SECRET ? '****' : '',
+      webhookUrl: `https://${process.env.WEB_APP_URL ? new URL(process.env.WEB_APP_URL).host : 'triq.dpdns.org'}/api/v1/tips/webhook`,
+      isConfigured: !!(map.PAYMONGO_SECRET_KEY && map.PAYMONGO_PUBLIC_KEY),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get PayMongo config', message: err.message });
+  }
+});
+
+// PUT /api/v1/admin/paymongo — save PayMongo config
+router.put('/paymongo', async (req, res) => {
+  try {
+    const { secretKey, publicKey, webhookSecret } = req.body;
+    const updates: { key: string; value: string; description: string }[] = [];
+
+    if (secretKey) updates.push({ key: 'PAYMONGO_SECRET_KEY', value: secretKey, description: 'PayMongo Secret API Key' });
+    if (publicKey) updates.push({ key: 'PAYMONGO_PUBLIC_KEY', value: publicKey, description: 'PayMongo Public API Key' });
+    if (webhookSecret) updates.push({ key: 'PAYMONGO_WEBHOOK_SECRET', value: webhookSecret, description: 'PayMongo Webhook Signing Secret' });
+
+    for (const u of updates) {
+      await prisma.systemConfig.upsert({
+        where: { key: u.key },
+        update: { value: u.value },
+        create: { key: u.key, value: u.value, description: u.description },
+      });
+    }
+
+    res.json({ success: true, updated: updates.length });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to save PayMongo config', message: err.message });
+  }
+});
+
 export default router;

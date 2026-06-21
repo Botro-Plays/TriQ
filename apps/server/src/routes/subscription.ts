@@ -21,7 +21,9 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       return;
     }
 
-    const PAYMONGO_SECRET = process.env.PAYMONGO_SECRET;
+    // Check SystemConfig first, then fall back to env var
+    const paymongoConfig = await prisma.systemConfig.findUnique({ where: { key: 'PAYMONGO_SECRET_KEY' } });
+    const PAYMONGO_SECRET = paymongoConfig?.value || process.env.PAYMONGO_SECRET_KEY || process.env.PAYMONGO_SECRET;
     if (!PAYMONGO_SECRET) {
       // Dev mode — create trial subscription without PayMongo
       const expiresAt = new Date();

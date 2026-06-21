@@ -3,7 +3,7 @@ import { useAuthStore } from '../stores/authStore';
 import {
   Home, Map, User, DollarSign, LayoutDashboard, ShieldCheck,
   Car, FlagTriangleRight, LogOut, Menu, X, History,
-  CreditCard, Heart, Users, Star, MoreHorizontal, Trophy,
+  CreditCard, Heart, Users, Star, MoreHorizontal, Trophy, Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -41,6 +41,7 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Ratings', path: '/admin/ratings', icon: Star },
     { label: 'Reports', path: '/admin/reports', icon: FlagTriangleRight },
     { label: 'More', path: '/admin/more', icon: MoreHorizontal },
+    { label: 'PayMongo', path: '/admin/paymongo', icon: Wallet },
   ],
   STAFF: [
     { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
@@ -53,6 +54,7 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Ratings', path: '/admin/ratings', icon: Star },
     { label: 'Reports', path: '/admin/reports', icon: FlagTriangleRight },
     { label: 'More', path: '/admin/more', icon: MoreHorizontal },
+    { label: 'PayMongo', path: '/admin/paymongo', icon: Wallet },
   ],
 };
 
@@ -239,7 +241,7 @@ export default function Layout() {
       {isAdmin && (
         <nav className="fixed bottom-0 left-0 right-0 z-30 bg-triq-slate/95 backdrop-blur-md border-t border-triq-light/20 shadow-bottom-nav safe-bottom md:hidden">
           <div className="flex items-center justify-around h-16 max-w-mobile mx-auto overflow-x-auto">
-            {items.slice(0, 6).map((item) => {
+            {items.slice(0, 7).map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
               return (
