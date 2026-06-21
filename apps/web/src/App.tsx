@@ -28,6 +28,7 @@ import AdminTips from './pages/admin/Tips';
 import AdminPassengers from './pages/admin/Passengers';
 import AdminRatings from './pages/admin/Ratings';
 import AdminMore from './pages/admin/More';
+import AdminEmergencies from './pages/admin/Emergencies';
 import AdminPayMongo from './pages/admin/PayMongo';
 
 function App() {
@@ -188,6 +189,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['OWNER', 'STAFF']}>
                 <AdminRatings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/emergencies"
+            element={
+              <ProtectedRoute allowedRoles={['OWNER', 'STAFF']}>
+                <AdminEmergencies />
               </ProtectedRoute>
             }
           />

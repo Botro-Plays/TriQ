@@ -149,16 +149,21 @@ router.post('/kyc/:documentId/reject', async (req, res) => {
   }
 });
 
-// GET /api/v1/admin/drivers — list all drivers
+// GET /api/v1/admin/drivers — list all drivers (supports ?search=name&limit=N for autocomplete)
 router.get('/drivers', async (req, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
-    const limit = 20;
+    const limit = parseInt(req.query.limit as string) || 20;
     const status = req.query.status as string;
+    const search = req.query.search as string;
 
     const where: any = {};
-    if (status && status !== 'all') {
-      where.status = status;
+    if (status && status !== 'all') where.status = status;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { plateNumber: { contains: search, mode: 'insensitive' } },
+      ];
     }
 
     const [drivers, total] = await Promise.all([
@@ -328,6 +333,60 @@ router.patch('/users/:id/role', async (req, res) => {
     res.json(user);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to update role', message: err.message });
+  }
+});
+
+// POST /api/v1/admin/grant-vip — grant a free VIP subscription to a driver
+router.post('/grant-vip', async (req, res) => {
+  try {
+    const { driverId, tier, days, reason } = req.body;
+    if (!driverId || !tier || !days) {
+      res.status(400).json({ error: 'driverId, tier, and days are required' });
+      return;
+    }
+    if (!['PRO', 'ELITE'].includes(tier)) {
+      res.status(400).json({ error: 'tier must be PRO or ELITE' });
+      return;
+    }
+    const numDays = Math.min(Math.max(1, parseInt(days)), 365);
+
+    const driver = await prisma.driver.findUnique({ where: { id: driverId } });
+    if (!driver) {
+      res.status(404).json({ error: 'Driver not found' });
+      return;
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + numDays * 24 * 60 * 60 * 1000);
+
+    // Update driver subscription fields
+    await prisma.driver.update({
+      where: { id: driverId },
+      data: {
+        subscriptionTier: tier as any,
+        subscriptionStatus: 'ACTIVE',
+        subscriptionExpiresAt: expiresAt,
+      },
+    });
+
+    // Create Subscription record (amount=0 = free/admin grant)
+    const sub = await prisma.subscription.create({
+      data: {
+        driverId,
+        tier: tier as any,
+        status: 'ACTIVE',
+        amount: 0,
+        isTrial: false,
+        startedAt: now,
+        expiresAt,
+        paymongoId: `admin-grant-${Date.now()}`,
+      },
+    });
+
+    console.log(`[Admin] Granted ${tier} VIP to driver ${driver.name} for ${numDays} days. Reason: ${reason || 'none'}`);
+    res.json({ subscription: sub, driver: { id: driver.id, name: driver.name, tier, expiresAt } });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to grant VIP', message: err.message });
   }
 });
 

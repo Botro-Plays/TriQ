@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
-import { ShieldAlert, AlertTriangle, Settings, X, ThumbsUp, ThumbsDown, MessageSquare, CheckCircle, XCircle, Phone, MapPin } from 'lucide-react';
+import { ShieldAlert, Settings, ThumbsUp, ThumbsDown, MessageSquare, CheckCircle, XCircle } from 'lucide-react';
 
-type Tab = 'strikes' | 'emergencies' | 'config' | 'thumbs' | 'feedback';
+type Tab = 'strikes' | 'config' | 'thumbs' | 'feedback';
 
 interface Strike {
   id: string;
@@ -12,25 +12,6 @@ interface Strike {
   expiresAt: string | null;
   passenger: { name: string };
   ride: { id: string; pickupAddress: string };
-}
-
-interface Emergency {
-  id: string;
-  alertType: string;
-  status: string;
-  lat: number | null;
-  lng: number | null;
-  notes: string | null;
-  resolvedAt: string | null;
-  resolvedBy: string | null;
-  createdAt: string;
-  ride: {
-    id: string;
-    pickupAddress: string;
-    dropoffAddress: string;
-    passenger: { name: string; user: { phoneNumber: string | null } };
-    driver: { name: string; plateNumber: string; user: { phoneNumber: string | null } } | null;
-  };
 }
 
 interface Config {
@@ -69,15 +50,12 @@ interface FeedbackData {
 export default function AdminMore() {
   const [tab, setTab] = useState<Tab>('strikes');
   const [strikes, setStrikes] = useState<Strike[]>([]);
-  const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [configs, setConfigs] = useState<Config[]>([]);
   const [thumbsData, setThumbsData] = useState<ThumbsAnalytics | null>(null);
   const [feedbackData, setFeedbackData] = useState<FeedbackData | null>(null);
   const [feedbackPage, setFeedbackPage] = useState(1);
   const [feedbackFilter, setFeedbackFilter] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
-  const [resolveModal, setResolveModal] = useState<Emergency | null>(null);
-  const [resolveNotes, setResolveNotes] = useState('');
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -91,11 +69,6 @@ export default function AdminMore() {
     if (tab === 'strikes') {
       api.get('/admin/strikes')
         .then((res) => setStrikes(res.data.strikes))
-        .catch(() => {})
-        .finally(() => setLoading(false));
-    } else if (tab === 'emergencies') {
-      api.get('/admin/emergencies')
-        .then((res) => setEmergencies(res.data.events))
         .catch(() => {})
         .finally(() => setLoading(false));
     } else if (tab === 'thumbs') {
@@ -131,22 +104,6 @@ export default function AdminMore() {
     }
   };
 
-  const resolveEmergency = async () => {
-    if (!resolveModal) return;
-    setActionLoading(resolveModal.id);
-    try {
-      await api.patch(`/admin/emergencies/${resolveModal.id}/resolve`, { notes: resolveNotes });
-      setEmergencies((prev) => prev.map((e) => e.id === resolveModal.id ? { ...e, status: 'RESOLVED', notes: resolveNotes } : e));
-      setResolveModal(null);
-      setResolveNotes('');
-      showToast('success', 'Emergency marked as resolved');
-    } catch (err: any) {
-      showToast('error', err?.response?.data?.error || 'Failed to resolve emergency');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   const updateConfig = async (key: string, value: string) => {
     try {
       await api.patch(`/admin/config/${key}`, { value });
@@ -175,7 +132,6 @@ export default function AdminMore() {
       <div className="flex gap-2">
         {[
           { key: 'strikes' as Tab, label: 'Strikes', icon: ShieldAlert },
-          { key: 'emergencies' as Tab, label: 'Emergencies', icon: AlertTriangle },
           { key: 'thumbs' as Tab, label: 'Thumbs', icon: ThumbsUp },
           { key: 'feedback' as Tab, label: 'Feedback', icon: MessageSquare },
           { key: 'config' as Tab, label: 'Config', icon: Settings },
@@ -225,85 +181,6 @@ export default function AdminMore() {
                     {actionLoading === s.id ? 'Revoking…' : 'Revoke'}
                   </button>
                 </div>
-              </div>
-            ))}
-          </div>
-        )
-      ) : tab === 'emergencies' ? (
-        emergencies.length === 0 ? (
-          <div className="card p-6 text-center">
-            <AlertTriangle size={32} className="text-gray-600 mx-auto mb-2" />
-            <p className="text-white font-semibold">No emergency events</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {emergencies.map((e) => (
-              <div key={e.id} className={`card p-3 space-y-2 ${e.status === 'ACTIVE' ? 'border border-red-500/40' : ''}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                      e.status === 'ACTIVE' ? 'bg-red-500/20 text-red-400' :
-                      e.status === 'RESOLVED' ? 'bg-green-500/20 text-green-400' :
-                      'bg-gray-500/20 text-gray-400'
-                    }`}>{e.status}</span>
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300 font-medium">{e.alertType}</span>
-                  </div>
-                  <span className="text-xs text-gray-500">{formatDate(e.createdAt)}</span>
-                </div>
-
-                {/* Contact info */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-300">🧍 {e.ride.passenger.name}</span>
-                    {e.ride.passenger.user.phoneNumber && (
-                      <a href={`tel:${e.ride.passenger.user.phoneNumber}`}
-                        className="flex items-center gap-1 text-xs text-triq-cyan">
-                        <Phone size={11} /> {e.ride.passenger.user.phoneNumber}
-                      </a>
-                    )}
-                  </div>
-                  {e.ride.driver && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-300">🛺 {e.ride.driver.name} ({e.ride.driver.plateNumber})</span>
-                      {e.ride.driver.user.phoneNumber && (
-                        <a href={`tel:${e.ride.driver.user.phoneNumber}`}
-                          className="flex items-center gap-1 text-xs text-triq-cyan">
-                          <Phone size={11} /> {e.ride.driver.user.phoneNumber}
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-xs text-gray-500 truncate">
-                  📍 {e.ride.pickupAddress} → {e.ride.dropoffAddress}
-                </div>
-
-                {/* Map link if coordinates known */}
-                {e.lat && e.lng && (
-                  <a
-                    href={`https://maps.google.com/?q=${e.lat},${e.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-triq-yellow"
-                  >
-                    <MapPin size={11} /> View on Google Maps ({e.lat.toFixed(5)}, {e.lng.toFixed(5)})
-                  </a>
-                )}
-
-                {e.notes && <p className="text-xs text-gray-300 italic border-t border-triq-light/10 pt-1">"{e.notes}"</p>}
-                {e.resolvedBy && (
-                  <p className="text-xs text-gray-500">Resolved by {e.resolvedBy} · {e.resolvedAt ? formatDate(e.resolvedAt) : ''}</p>
-                )}
-
-                {e.status === 'ACTIVE' && (
-                  <button
-                    onClick={() => { setResolveModal(e); setResolveNotes(''); }}
-                    className="w-full h-8 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 text-xs font-medium"
-                  >
-                    Take Action / Mark Resolved
-                  </button>
-                )}
               </div>
             ))}
           </div>
@@ -460,78 +337,6 @@ export default function AdminMore() {
         </div>
       )}
 
-      {/* Resolve emergency modal */}
-      {resolveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setResolveModal(null)}>
-          <div className="bg-triq-slate rounded-xl border border-triq-light/30 p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Resolve Emergency</h3>
-              <button onClick={() => setResolveModal(null)} className="text-gray-400 hover:text-white"><X size={18} /></button>
-            </div>
-            <div className="space-y-1 text-sm">
-              <p className="text-gray-300">🧍 {resolveModal.ride.passenger.name}
-                {resolveModal.ride.passenger.user.phoneNumber && (
-                  <a href={`tel:${resolveModal.ride.passenger.user.phoneNumber}`} className="ml-2 text-triq-cyan">
-                    <Phone size={12} className="inline" /> {resolveModal.ride.passenger.user.phoneNumber}
-                  </a>
-                )}
-              </p>
-              {resolveModal.ride.driver && (
-                <p className="text-gray-300">🛺 {resolveModal.ride.driver.name} ({resolveModal.ride.driver.plateNumber})
-                  {resolveModal.ride.driver.user.phoneNumber && (
-                    <a href={`tel:${resolveModal.ride.driver.user.phoneNumber}`} className="ml-2 text-triq-cyan">
-                      <Phone size={12} className="inline" /> {resolveModal.ride.driver.user.phoneNumber}
-                    </a>
-                  )}
-                </p>
-              )}
-              {resolveModal.lat && resolveModal.lng && (
-                <a
-                  href={`https://maps.google.com/?q=${resolveModal.lat},${resolveModal.lng}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-triq-yellow text-xs"
-                >
-                  <MapPin size={11} /> View location on Google Maps
-                </a>
-              )}
-            </div>
-            <textarea
-              value={resolveNotes}
-              onChange={(e) => setResolveNotes(e.target.value)}
-              placeholder="Resolution notes (e.g. 'Contacted police', 'False alarm confirmed by passenger')"
-              rows={3}
-              className="w-full px-3 py-2 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm resize-none"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={resolveEmergency}
-                disabled={actionLoading === resolveModal?.id}
-                className="flex-1 h-10 rounded-lg bg-green-500 text-white font-bold text-sm disabled:opacity-40"
-              >
-                {actionLoading === resolveModal?.id ? 'Saving…' : '✅ Mark Resolved'}
-              </button>
-              <button
-                onClick={async () => {
-                  if (!resolveModal) return;
-                  setActionLoading(resolveModal.id);
-                  try {
-                    await api.patch(`/admin/emergencies/${resolveModal.id}/resolve`, { notes: resolveNotes, status: 'FALSE_ALARM' });
-                    setEmergencies((prev) => prev.map((e) => e.id === resolveModal.id ? { ...e, status: 'FALSE_ALARM', notes: resolveNotes } : e));
-                    setResolveModal(null); setResolveNotes('');
-                    showToast('success', 'Marked as false alarm');
-                  } catch (err: any) {
-                    showToast('error', err?.response?.data?.error || 'Failed');
-                  } finally { setActionLoading(null); }
-                }}
-                disabled={actionLoading === resolveModal?.id}
-                className="flex-1 h-10 rounded-lg bg-gray-500/20 text-gray-300 border border-gray-500/30 font-bold text-sm disabled:opacity-40"
-              >
-                🚫 False Alarm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

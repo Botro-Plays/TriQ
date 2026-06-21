@@ -131,6 +131,33 @@ export function startRideCron() {
       if (pendingRides.length || stuckAccepted.length || longRides.length) {
         console.log(`[rideCron] Sent reminders — pending:${pendingRides.length} stuck:${stuckAccepted.length} long:${longRides.length}`);
       }
+
+      // ── 4. Auto-expire subscriptions ─────────────────────────────────────
+      const expiredDrivers = await prisma.driver.findMany({
+        where: {
+          subscriptionStatus: 'ACTIVE',
+          subscriptionTier: { not: 'FREE' as any },
+          subscriptionExpiresAt: { lt: now },
+        },
+        select: { id: true, name: true },
+      });
+
+      for (const drv of expiredDrivers) {
+        await prisma.driver.update({
+          where: { id: drv.id },
+          data: { subscriptionTier: 'FREE' as any, subscriptionStatus: 'ACTIVE', subscriptionExpiresAt: null },
+        });
+        // Also expire active Subscription records for this driver
+        await prisma.subscription.updateMany({
+          where: { driverId: drv.id, status: 'ACTIVE' },
+          data: { status: 'EXPIRED' },
+        });
+        console.log(`[rideCron] Subscription expired for driver: ${drv.name}`);
+      }
+
+      if (expiredDrivers.length) {
+        console.log(`[rideCron] Expired ${expiredDrivers.length} subscription(s)`);
+      }
     } catch (err: any) {
       console.error('[rideCron] Error:', err?.message);
     }

@@ -3,7 +3,7 @@ import { useAuthStore } from '../stores/authStore';
 import {
   Home, Map, User, DollarSign, LayoutDashboard, ShieldCheck,
   Car, FlagTriangleRight, LogOut, Menu, X, History,
-  CreditCard, Heart, Users, Star, MoreHorizontal, Trophy, Wallet,
+  CreditCard, Heart, Users, Star, MoreHorizontal, Trophy, Wallet, AlertTriangle,
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -42,7 +42,8 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Passengers', path: '/admin/passengers', icon: Users, group: 'Management' },
     { label: 'Ratings', path: '/admin/ratings', icon: Star, group: 'Management' },
     { label: 'Reports', path: '/admin/reports', icon: FlagTriangleRight, group: 'Management' },
-    { label: 'More', path: '/admin/more', icon: MoreHorizontal, group: 'Management' },
+    { label: 'Emergencies', path: '/admin/emergencies', icon: AlertTriangle, group: 'Management' },
+    { label: 'Safety', path: '/admin/more', icon: MoreHorizontal, group: 'Management' },
     { label: 'Subscriptions', path: '/admin/subscriptions', icon: CreditCard, group: 'Finance' },
     { label: 'Tips', path: '/admin/tips', icon: Heart, group: 'Finance' },
     { label: 'PayMongo', path: '/admin/paymongo', icon: Wallet, group: 'Finance' },
@@ -55,7 +56,8 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Passengers', path: '/admin/passengers', icon: Users, group: 'Management' },
     { label: 'Ratings', path: '/admin/ratings', icon: Star, group: 'Management' },
     { label: 'Reports', path: '/admin/reports', icon: FlagTriangleRight, group: 'Management' },
-    { label: 'More', path: '/admin/more', icon: MoreHorizontal, group: 'Management' },
+    { label: 'Emergencies', path: '/admin/emergencies', icon: AlertTriangle, group: 'Management' },
+    { label: 'Safety', path: '/admin/more', icon: MoreHorizontal, group: 'Management' },
     { label: 'Subscriptions', path: '/admin/subscriptions', icon: CreditCard, group: 'Finance' },
     { label: 'Tips', path: '/admin/tips', icon: Heart, group: 'Finance' },
     { label: 'PayMongo', path: '/admin/paymongo', icon: Wallet, group: 'Finance' },
