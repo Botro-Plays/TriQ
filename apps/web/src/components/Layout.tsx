@@ -14,6 +14,7 @@ interface NavItem {
   label: string;
   path: string;
   icon: LucideIcon;
+  group?: string;
 }
 
 const NAV_ITEMS: Record<UserRole, NavItem[]> = {
@@ -31,30 +32,30 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Profile', path: '/driver/profile', icon: User },
   ],
   OWNER: [
-    { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-    { label: 'KYC', path: '/admin/kyc', icon: ShieldCheck },
-    { label: 'Drivers', path: '/admin/drivers', icon: Car },
-    { label: 'Rides', path: '/admin/rides', icon: Map },
-    { label: 'Passengers', path: '/admin/passengers', icon: Users },
-    { label: 'Subs', path: '/admin/subscriptions', icon: CreditCard },
-    { label: 'Tips', path: '/admin/tips', icon: Heart },
-    { label: 'Ratings', path: '/admin/ratings', icon: Star },
-    { label: 'Reports', path: '/admin/reports', icon: FlagTriangleRight },
-    { label: 'More', path: '/admin/more', icon: MoreHorizontal },
-    { label: 'PayMongo', path: '/admin/paymongo', icon: Wallet },
+    { label: 'Dashboard', path: '/admin', icon: LayoutDashboard, group: 'Overview' },
+    { label: 'KYC Reviews', path: '/admin/kyc', icon: ShieldCheck, group: 'Overview' },
+    { label: 'Drivers', path: '/admin/drivers', icon: Car, group: 'Management' },
+    { label: 'Rides', path: '/admin/rides', icon: Map, group: 'Management' },
+    { label: 'Passengers', path: '/admin/passengers', icon: Users, group: 'Management' },
+    { label: 'Ratings', path: '/admin/ratings', icon: Star, group: 'Management' },
+    { label: 'Reports', path: '/admin/reports', icon: FlagTriangleRight, group: 'Management' },
+    { label: 'More', path: '/admin/more', icon: MoreHorizontal, group: 'Management' },
+    { label: 'Subscriptions', path: '/admin/subscriptions', icon: CreditCard, group: 'Finance' },
+    { label: 'Tips', path: '/admin/tips', icon: Heart, group: 'Finance' },
+    { label: 'PayMongo', path: '/admin/paymongo', icon: Wallet, group: 'Finance' },
   ],
   STAFF: [
-    { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-    { label: 'KYC', path: '/admin/kyc', icon: ShieldCheck },
-    { label: 'Drivers', path: '/admin/drivers', icon: Car },
-    { label: 'Rides', path: '/admin/rides', icon: Map },
-    { label: 'Passengers', path: '/admin/passengers', icon: Users },
-    { label: 'Subs', path: '/admin/subscriptions', icon: CreditCard },
-    { label: 'Tips', path: '/admin/tips', icon: Heart },
-    { label: 'Ratings', path: '/admin/ratings', icon: Star },
-    { label: 'Reports', path: '/admin/reports', icon: FlagTriangleRight },
-    { label: 'More', path: '/admin/more', icon: MoreHorizontal },
-    { label: 'PayMongo', path: '/admin/paymongo', icon: Wallet },
+    { label: 'Dashboard', path: '/admin', icon: LayoutDashboard, group: 'Overview' },
+    { label: 'KYC Reviews', path: '/admin/kyc', icon: ShieldCheck, group: 'Overview' },
+    { label: 'Drivers', path: '/admin/drivers', icon: Car, group: 'Management' },
+    { label: 'Rides', path: '/admin/rides', icon: Map, group: 'Management' },
+    { label: 'Passengers', path: '/admin/passengers', icon: Users, group: 'Management' },
+    { label: 'Ratings', path: '/admin/ratings', icon: Star, group: 'Management' },
+    { label: 'Reports', path: '/admin/reports', icon: FlagTriangleRight, group: 'Management' },
+    { label: 'More', path: '/admin/more', icon: MoreHorizontal, group: 'Management' },
+    { label: 'Subscriptions', path: '/admin/subscriptions', icon: CreditCard, group: 'Finance' },
+    { label: 'Tips', path: '/admin/tips', icon: Heart, group: 'Finance' },
+    { label: 'PayMongo', path: '/admin/paymongo', icon: Wallet, group: 'Finance' },
   ],
 };
 
@@ -75,6 +76,7 @@ export default function Layout() {
 
   const items = NAV_ITEMS[role as UserRole] || [];
   const isAdmin = role === 'OWNER' || role === 'STAFF';
+  const roleHome = role === 'PASSENGER' ? '/passenger' : role === 'DRIVER' ? '/driver' : '/admin';
 
   const handleLogout = () => {
     logout();
@@ -82,11 +84,19 @@ export default function Layout() {
   };
 
   const isActive = (path: string) => {
-    if (path === `/${role.toLowerCase().split('_')[0]}` || path === '/admin') {
+    if (path === roleHome) {
       return location.pathname === path;
     }
     return location.pathname.startsWith(path);
   };
+
+  // Group admin nav items by category for sidebar
+  const groupedItems = isAdmin ? items.reduce((acc, item) => {
+    const group = item.group || 'Other';
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(item);
+    return acc;
+  }, {} as Record<string, NavItem[]>) : null;
 
   return (
     <div className="min-h-screen bg-triq-dark flex flex-col">
@@ -133,28 +143,8 @@ export default function Layout() {
             </nav>
           )}
 
-          {/* Desktop nav for admin */}
-          {isAdmin && (
-            <nav className="hidden md:flex items-center gap-1">
-              {items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                      isActive(item.path)
-                        ? 'bg-triq-cyan/15 text-triq-cyan font-semibold'
-                        : 'text-gray-400 hover:text-white hover:bg-triq-light/10'
-                    }`}
-                  >
-                    <Icon size={16} />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          )}
+          {/* Desktop nav for admin — handled by persistent sidebar below */}
+          {isAdmin && <div className="hidden md:block" />}
 
           <button
             onClick={handleLogout}
@@ -166,7 +156,47 @@ export default function Layout() {
         </div>
       </header>
 
-      {/* Admin sidebar overlay (mobile) */}
+      {/* Admin desktop sidebar */}
+      {isAdmin && groupedItems && (
+        <aside className="hidden md:flex fixed left-0 top-14 bottom-0 w-60 bg-triq-slate/50 border-r border-triq-light/10 flex-col overflow-y-auto z-20">
+          <nav className="flex-1 px-3 py-4 space-y-5">
+            {Object.entries(groupedItems).map(([group, groupItems]) => (
+              <div key={group} className="space-y-0.5">
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-1.5">{group}</p>
+                {groupItems.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.path);
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
+                        active
+                          ? 'bg-triq-cyan/15 text-triq-cyan font-semibold'
+                          : 'text-gray-400 hover:text-white hover:bg-triq-light/10'
+                      }`}
+                    >
+                      <Icon size={17} className={active ? 'text-triq-cyan' : 'text-gray-500'} />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+          <div className="px-3 py-3 border-t border-triq-light/10">
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors w-full"
+            >
+              <LogOut size={17} />
+              Logout
+            </button>
+          </div>
+        </aside>
+      )}
+
+      {/* Admin mobile sidebar drawer */}
       {isAdmin && sidebarOpen && (
         <div className="fixed inset-0 z-40 md:hidden" onClick={() => setSidebarOpen(false)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -175,38 +205,49 @@ export default function Layout() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-4 border-b border-triq-light/10">
-              <span className="text-sm font-bold text-white">Admin Menu</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-triq-yellow">TriQ</span>
+                <span className="text-[10px] font-semibold text-triq-cyan uppercase tracking-wider px-1.5 py-0.5 rounded bg-triq-cyan/10">
+                  {ROLE_LABELS[role as UserRole]}
+                </span>
+              </div>
               <button onClick={() => setSidebarOpen(false)} className="p-1 rounded-lg hover:bg-triq-light/10">
                 <X size={20} className="text-gray-400" />
               </button>
             </div>
-            <nav className="p-2 space-y-0.5">
-              {items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                      isActive(item.path)
-                        ? 'bg-triq-cyan/15 text-triq-cyan font-semibold'
-                        : 'text-gray-400 hover:text-white hover:bg-triq-light/10'
-                    }`}
-                  >
-                    <Icon size={18} />
-                    {item.label}
-                  </Link>
-                );
-              })}
+            <nav className="p-3 space-y-5 overflow-y-auto">
+              {groupedItems && Object.entries(groupedItems).map(([group, groupItems]) => (
+                <div key={group} className="space-y-0.5">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-1.5">{group}</p>
+                  {groupItems.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.path);
+                    return (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+                          active
+                            ? 'bg-triq-cyan/15 text-triq-cyan font-semibold'
+                            : 'text-gray-400 hover:text-white hover:bg-triq-light/10'
+                        }`}
+                      >
+                        <Icon size={18} className={active ? 'text-triq-cyan' : 'text-gray-500'} />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ))}
             </nav>
           </div>
         </div>
       )}
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto pb-20 sm:pb-4">
-        <div className={`mx-auto px-4 py-4 sm:py-6 animate-fade-in ${isAdmin ? 'max-w-4xl' : 'max-w-2xl'}`}>
+      <main className={`flex-1 overflow-y-auto pb-20 sm:pb-4 ${isAdmin ? 'md:ml-60' : ''}`}>
+        <div className={`mx-auto px-4 py-4 sm:py-6 animate-fade-in ${isAdmin ? 'max-w-6xl' : 'max-w-2xl'}`}>
           <Outlet />
         </div>
       </main>

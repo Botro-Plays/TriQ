@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
+import { Users, Car, Wifi, Activity, CalendarCheck, CheckCircle, Coins, ShieldAlert, Ban, TrendingUp, Heart, CreditCard } from 'lucide-react';
 
 interface Stats {
   totalPassengers: number;
@@ -50,50 +51,74 @@ export default function AdminDashboard() {
   const formatPeso = (centavos: number) => `₱${(centavos / 100).toLocaleString('en-PH', { maximumFractionDigits: 0 })}`;
 
   const cards = [
-    { label: 'Total Passengers', value: stats.totalPassengers, color: 'text-triq-cyan' },
-    { label: 'Total Drivers', value: stats.totalDrivers, color: 'text-triq-yellow' },
-    { label: 'Online Now', value: stats.onlineDrivers, color: 'text-green-400' },
-    { label: 'Active Rides', value: stats.activeRides, color: 'text-orange-400' },
-    { label: 'Today\'s Rides', value: stats.todayRides, color: 'text-blue-400' },
-    { label: 'Completed', value: stats.completedRides, color: 'text-green-400' },
-    { label: 'Total Fares', value: formatPeso(stats.totalFares), color: 'text-triq-yellow' },
-    { label: 'Pending KYC', value: stats.pendingKyc, color: 'text-purple-400' },
-    { label: 'Suspended', value: stats.suspendedDrivers, color: 'text-red-400' },
+    { label: 'Total Passengers', value: stats.totalPassengers, color: 'text-triq-cyan', icon: Users, bg: 'bg-triq-cyan/10' },
+    { label: 'Total Drivers', value: stats.totalDrivers, color: 'text-triq-yellow', icon: Car, bg: 'bg-triq-yellow/10' },
+    { label: 'Online Now', value: stats.onlineDrivers, color: 'text-green-400', icon: Wifi, bg: 'bg-green-500/10' },
+    { label: 'Active Rides', value: stats.activeRides, color: 'text-orange-400', icon: Activity, bg: 'bg-orange-500/10' },
+    { label: "Today's Rides", value: stats.todayRides, color: 'text-blue-400', icon: CalendarCheck, bg: 'bg-blue-500/10' },
+    { label: 'Completed', value: stats.completedRides, color: 'text-green-400', icon: CheckCircle, bg: 'bg-green-500/10' },
+    { label: 'Total Fares', value: formatPeso(stats.totalFares), color: 'text-triq-yellow', icon: Coins, bg: 'bg-triq-yellow/10' },
+    { label: 'Pending KYC', value: stats.pendingKyc, color: 'text-purple-400', icon: ShieldAlert, bg: 'bg-purple-500/10' },
+    { label: 'Suspended', value: stats.suspendedDrivers, color: 'text-red-400', icon: Ban, bg: 'bg-red-500/10' },
   ];
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-triq-yellow">Dashboard</h1>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-triq-yellow">Dashboard</h1>
+        <span className="text-xs text-gray-500">Auto-refreshes every 30s</span>
+      </div>
 
       {/* Platform revenue breakdown */}
-      <div className="bg-gradient-to-r from-triq-slate to-triq-dark rounded-xl border border-triq-yellow/20 p-5 space-y-3">
-        <p className="text-xs text-gray-400 uppercase tracking-wider">Platform Revenue</p>
-        <p className="text-3xl font-bold text-triq-yellow">{formatPeso(stats.totalPlatformRevenue)}</p>
-        <div className="flex gap-4 text-sm">
-          <div>
-            <span className="text-gray-400">Subscriptions: </span>
-            <span className="text-green-400 font-semibold">{formatPeso(stats.subscriptionRevenue)}</span>
+      <div className="bg-gradient-to-br from-triq-slate to-triq-dark rounded-xl border border-triq-yellow/20 p-5 sm:p-6 space-y-4 shadow-card">
+        <div className="flex items-center gap-2">
+          <TrendingUp size={18} className="text-triq-yellow" />
+          <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Platform Revenue</p>
+        </div>
+        <p className="text-3xl sm:text-4xl font-bold text-triq-yellow">{formatPeso(stats.totalPlatformRevenue)}</p>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="flex items-center gap-2.5 bg-triq-dark/50 rounded-lg p-3 border border-triq-light/10">
+            <div className="w-9 h-9 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
+              <CreditCard size={16} className="text-green-400" />
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Subscriptions</p>
+              <p className="text-green-400 font-semibold">{formatPeso(stats.subscriptionRevenue)}</p>
+            </div>
           </div>
-          <div>
-            <span className="text-gray-400">Tips: </span>
-            <span className="text-triq-cyan font-semibold">{formatPeso(stats.tipRevenue)}</span>
+          <div className="flex items-center gap-2.5 bg-triq-dark/50 rounded-lg p-3 border border-triq-light/10">
+            <div className="w-9 h-9 rounded-lg bg-triq-cyan/10 flex items-center justify-center shrink-0">
+              <Heart size={16} className="text-triq-cyan" />
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs">Tips</p>
+              <p className="text-triq-cyan font-semibold">{formatPeso(stats.tipRevenue)}</p>
+            </div>
           </div>
         </div>
-        <div className="flex gap-4 text-xs text-gray-500 pt-1 border-t border-triq-light/10">
+        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500 pt-3 border-t border-triq-light/10">
           <span>Active Subs: <span className="text-white font-bold">{stats.activeSubscriptions}</span></span>
-          <span>Pro: <span className="text-white font-bold">{stats.proSubscriptions}</span></span>
+          <span>Pro Tier: <span className="text-white font-bold">{stats.proSubscriptions}</span></span>
           <span>Completed Rides: <span className="text-white font-bold">{stats.completedRides}</span></span>
         </div>
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {cards.map((card) => (
-          <div key={card.label} className="bg-triq-slate rounded-xl border border-triq-light/20 p-4">
-            <p className="text-xs text-gray-400 uppercase tracking-wider">{card.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${card.color}`}>{card.value}</p>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {cards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div key={card.label} className="bg-triq-slate rounded-xl border border-triq-light/20 p-4 hover:border-triq-light/40 transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <div className={`w-9 h-9 rounded-lg ${card.bg} flex items-center justify-center`}>
+                  <Icon size={17} className={card.color} />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 uppercase tracking-wider">{card.label}</p>
+              <p className={`text-2xl font-bold mt-0.5 ${card.color}`}>{card.value}</p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
