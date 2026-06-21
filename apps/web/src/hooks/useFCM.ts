@@ -24,8 +24,8 @@ export function useFCM() {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return;
 
-        // Use dedicated FCM service worker
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/firebase-sw/' });
+        // Register FCM service worker at root scope so it receives push events for all app pages
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
 
         const messaging = getMessaging(app);
         const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });

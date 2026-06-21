@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
-import { ShieldAlert, AlertTriangle, Settings, X, ThumbsUp, ThumbsDown, MessageSquare } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Settings, X, ThumbsUp, ThumbsDown, MessageSquare, CheckCircle, XCircle } from 'lucide-react';
 
 type Tab = 'strikes' | 'emergencies' | 'config' | 'thumbs' | 'feedback';
 
@@ -35,6 +35,7 @@ interface Config {
   id: string;
   key: string;
   value: string;
+  masked: boolean;
   description: string | null;
   updatedAt: string;
 }
@@ -75,6 +76,13 @@ export default function AdminMore() {
   const [loading, setLoading] = useState(true);
   const [resolveModal, setResolveModal] = useState<Emergency | null>(null);
   const [resolveNotes, setResolveNotes] = useState('');
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const showToast = (type: 'success' | 'error', msg: string) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -109,32 +117,58 @@ export default function AdminMore() {
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const revokeStrike = async (id: string) => {
+    setActionLoading(id);
     try {
       await api.patch(`/admin/strikes/${id}/revoke`);
       setStrikes((prev) => prev.filter((s) => s.id !== id));
-    } catch {}
+      showToast('success', 'Strike revoked');
+    } catch (err: any) {
+      showToast('error', err?.response?.data?.error || 'Failed to revoke strike');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const resolveEmergency = async () => {
     if (!resolveModal) return;
+    setActionLoading(resolveModal.id);
     try {
       await api.patch(`/admin/emergencies/${resolveModal.id}/resolve`, { notes: resolveNotes });
       setEmergencies((prev) => prev.map((e) => e.id === resolveModal.id ? { ...e, status: 'RESOLVED', notes: resolveNotes } : e));
       setResolveModal(null);
       setResolveNotes('');
-    } catch {}
+      showToast('success', 'Emergency marked as resolved');
+    } catch (err: any) {
+      showToast('error', err?.response?.data?.error || 'Failed to resolve emergency');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const updateConfig = async (key: string, value: string) => {
     try {
       await api.patch(`/admin/config/${key}`, { value });
-      setConfigs((prev) => prev.map((c) => c.key === key ? { ...c, value } : c));
-    } catch {}
+      // Re-fetch configs so masked values are refreshed from server
+      const res = await api.get('/admin/config');
+      setConfigs(res.data.configs);
+      showToast('success', `${key} updated`);
+    } catch (err: any) {
+      showToast('error', err?.response?.data?.error || 'Failed to update config');
+    }
   };
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-triq-yellow">Safety & Config</h1>
+
+      {toast && (
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+          toast.type === 'success' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle size={14} /> : <XCircle size={14} />}
+          {toast.msg}
+        </div>
+      )}
 
       <div className="flex gap-2">
         {[
@@ -183,9 +217,10 @@ export default function AdminMore() {
                   <span className="text-xs text-gray-500">Issued by: {s.issuedBy}</span>
                   <button
                     onClick={() => revokeStrike(s.id)}
-                    className="px-2 py-1 rounded-lg bg-triq-light/10 text-gray-300 text-xs font-medium"
+                    disabled={actionLoading === s.id}
+                    className="px-2 py-1 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-medium disabled:opacity-40"
                   >
-                    Revoke
+                    {actionLoading === s.id ? 'Revoking…' : 'Revoke'}
                   </button>
                 </div>
               </div>
@@ -222,7 +257,7 @@ export default function AdminMore() {
                     onClick={() => { setResolveModal(e); setResolveNotes(''); }}
                     className="w-full h-8 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 text-xs font-medium"
                   >
-                    Resolve
+                    Mark Resolved
                   </button>
                 )}
               </div>
@@ -401,9 +436,10 @@ export default function AdminMore() {
             />
             <button
               onClick={resolveEmergency}
-              className="w-full h-10 rounded-lg bg-green-500 text-white font-bold text-sm"
+              disabled={actionLoading === resolveModal?.id}
+              className="w-full h-10 rounded-lg bg-green-500 text-white font-bold text-sm disabled:opacity-40"
             >
-              Mark Resolved
+              {actionLoading === resolveModal?.id ? 'Resolving…' : 'Mark Resolved'}
             </button>
           </div>
         </div>
@@ -413,13 +449,24 @@ export default function AdminMore() {
 }
 
 function ConfigRow({ config, onSave, formatDate }: { config: Config; onSave: (key: string, value: string) => void; formatDate: (d: string) => string }) {
-  const [value, setValue] = useState(config.value);
+  const [value, setValue] = useState('');
   const [editing, setEditing] = useState(false);
+
+  const startEdit = () => {
+    // For masked fields, clear the input so admin must re-enter the full value
+    setValue(config.masked ? '' : config.value);
+    setEditing(true);
+  };
 
   return (
     <div className="card p-3 space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-mono text-triq-cyan">{config.key}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-mono text-triq-cyan">{config.key}</span>
+          {config.masked && (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/20">sensitive</span>
+          )}
+        </div>
         <span className="text-xs text-gray-500">Updated {formatDate(config.updatedAt)}</span>
       </div>
       {config.description && <p className="text-xs text-gray-400">{config.description}</p>}
@@ -428,20 +475,29 @@ function ConfigRow({ config, onSave, formatDate }: { config: Config; onSave: (ke
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            placeholder={config.masked ? 'Enter new value…' : undefined}
             className="flex-1 px-2 py-1 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+            type={config.masked ? 'password' : 'text'}
+            autoComplete="off"
           />
           <button
-            onClick={() => { onSave(config.key, value); setEditing(false); }}
+            onClick={() => { if (value.trim()) onSave(config.key, value); setEditing(false); }}
             className="px-3 py-1 rounded-lg bg-green-500/20 text-green-400 text-xs font-medium"
           >
             Save
           </button>
+          <button
+            onClick={() => setEditing(false)}
+            className="px-2 py-1 rounded-lg bg-triq-light/10 text-gray-400 text-xs font-medium"
+          >
+            Cancel
+          </button>
         </div>
       ) : (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-white">{config.value}</span>
+          <span className="text-sm font-mono text-white">{config.value}</span>
           <button
-            onClick={() => setEditing(true)}
+            onClick={startEdit}
             className="px-2 py-1 rounded-lg bg-triq-light/10 text-gray-300 text-xs font-medium"
           >
             Edit

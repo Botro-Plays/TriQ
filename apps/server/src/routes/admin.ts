@@ -575,11 +575,21 @@ router.patch('/emergencies/:id/resolve', async (req, res) => {
   }
 });
 
-// GET /api/v1/admin/config — get all system config
+// GET /api/v1/admin/config — get all system config (sensitive values masked)
+const SENSITIVE_KEY_PATTERNS = ['SECRET', 'KEY', 'TOKEN', 'PASSWORD', 'WEBHOOK'];
+const isSensitiveKey = (k: string) => SENSITIVE_KEY_PATTERNS.some((p) => k.toUpperCase().includes(p));
+const maskConfigValue = (v: string) => (v.length <= 8 ? '****' : `${v.slice(0, 4)}****${v.slice(-4)}`);
+
 router.get('/config', async (_req, res) => {
   try {
     const configs = await prisma.systemConfig.findMany({ orderBy: { key: 'asc' } });
-    res.json({ configs });
+    res.json({
+      configs: configs.map((c) => ({
+        ...c,
+        value: isSensitiveKey(c.key) ? maskConfigValue(c.value) : c.value,
+        masked: isSensitiveKey(c.key),
+      })),
+    });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get config', message: err.message });
   }
