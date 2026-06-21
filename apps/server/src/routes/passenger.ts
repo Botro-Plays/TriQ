@@ -118,7 +118,7 @@ router.get('/:id/places', async (req, res) => {
 // POST /api/v1/passengers/:id/kyc — submit KYC documents
 router.post('/:id/kyc', async (req, res) => {
   try {
-    const { documentType, documentUrl } = req.body;
+    const { documentType, documentUrl, selfieUrl } = req.body;
     if (!documentType || !documentUrl) {
       res.status(400).json({ error: 'documentType and documentUrl are required' });
       return;
@@ -130,23 +130,57 @@ router.post('/:id/kyc', async (req, res) => {
       return;
     }
 
-    const doc = await prisma.document.create({
-      data: {
-        passengerId: passenger.id,
-        type: documentType,
-        url: documentUrl,
-        status: 'PENDING',
-      },
-    });
+    // Create ID document
+    const docs = await prisma.$transaction([
+      prisma.document.create({
+        data: {
+          passengerId: passenger.id,
+          type: documentType as any,
+          url: documentUrl,
+          status: 'PENDING',
+        },
+      }),
+      ...(selfieUrl ? [prisma.document.create({
+        data: {
+          passengerId: passenger.id,
+          type: 'PASSENGER_SELFIE' as any,
+          url: selfieUrl,
+          status: 'PENDING',
+        },
+      })] : []),
+    ]);
 
     await prisma.passenger.update({
       where: { id: passenger.id },
       data: { kycStatus: 'PENDING_REVIEW' },
     });
 
-    res.status(201).json(doc);
+    res.status(201).json({ documents: docs });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to submit KYC', message: err.message });
+  }
+});
+
+// GET /api/v1/passengers/:id/kyc — get passenger's KYC documents and status
+router.get('/:id/kyc', async (req, res) => {
+  try {
+    const passenger = await prisma.passenger.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, kycStatus: true, kycRejectionReason: true },
+    });
+    if (!passenger) {
+      res.status(404).json({ error: 'Passenger not found' });
+      return;
+    }
+
+    const documents = await prisma.document.findMany({
+      where: { passengerId: passenger.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ ...passenger, documents });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get KYC status', message: err.message });
   }
 });
 

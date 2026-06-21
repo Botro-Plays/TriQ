@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
-import { Phone, Car, Star, Shield, Bike, MapPin } from 'lucide-react';
+import { Phone, Car, Star, Shield, Bike, MapPin, Crown, Award, Zap, X } from 'lucide-react';
 
 interface DriverData {
   id: string;
@@ -18,26 +18,66 @@ interface DriverData {
   kycStatus: string;
   pickupRadius: number;
   subscriptionTier: string;
+  subscriptionStatus: string;
 }
+
+interface KycData {
+  kycStatus: string;
+  kycRejectionReason: string | null;
+  documents: { id: string; type: string; url: string; status: string }[];
+}
+
+interface BadgeData {
+  badges: { id: string; awardedAt: string; badge: { code: string; name: string; description: string; iconUrl: string | null } }[];
+  points: { id: string; points: number; reason: string; createdAt: string }[];
+  totalPoints: number;
+}
+
+const DRIVER_DOC_TYPES = [
+  { value: 'DRIVER_LICENSE', label: "Driver's License" },
+  { value: 'FRANCHISE_PERMIT', label: 'Franchise Permit' },
+  { value: 'OR_CR', label: 'OR / CR' },
+  { value: 'GOVT_ID', label: 'Government ID' },
+];
 
 export default function DriverProfile() {
   const { user } = useAuthStore();
   const [driver, setDriver] = useState<DriverData | null>(null);
+  const [kycData, setKycData] = useState<KycData | null>(null);
+  const [badgeData, setBadgeData] = useState<BadgeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [radius, setRadius] = useState(2.0);
   const [savingRadius, setSavingRadius] = useState(false);
   const [radiusSaved, setRadiusSaved] = useState(false);
 
-  useEffect(() => {
+  // KYC form state
+  const [showKycForm, setShowKycForm] = useState(false);
+  const [kycDocs, setKycDocs] = useState<{ type: string; url: string }[]>([{ type: '', url: '' }]);
+  const [submittingKyc, setSubmittingKyc] = useState(false);
+
+  // Subscription state
+  const [subscribing, setSubscribing] = useState(false);
+
+  const fetchAll = () => {
     if (!user) return;
     api.get('/drivers', { params: { userId: user.id } })
       .then((res) => {
         setDriver(res.data);
         setRadius(res.data.pickupRadius || 2.0);
+        return Promise.all([
+          api.get(`/drivers/${res.data.id}/kyc`),
+          api.get('/gamification/badges/me'),
+        ]);
+      })
+      .then(([kycRes, badgeRes]) => {
+        setKycData(kycRes.data);
+        setBadgeData(badgeRes.data);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [user]);
+  };
+
+  useEffect(() => { fetchAll(); }, [user]);
 
   const saveRadius = async () => {
     if (!driver) return;
@@ -46,9 +86,33 @@ export default function DriverProfile() {
       await api.patch(`/drivers/${driver.id}/radius`, { radius });
       setRadiusSaved(true);
       setTimeout(() => setRadiusSaved(false), 2000);
-    } catch {} finally {
-      setSavingRadius(false);
-    }
+    } catch {} finally { setSavingRadius(false); }
+  };
+
+  const submitKyc = async () => {
+    if (!driver) return;
+    const valid = kycDocs.filter((d) => d.type && d.url);
+    if (valid.length === 0) return;
+    setSubmittingKyc(true);
+    try {
+      await api.post(`/drivers/${driver.id}/kyc`, { documents: valid });
+      setShowKycForm(false);
+      setKycDocs([{ type: '', url: '' }]);
+      fetchAll();
+    } catch {} finally { setSubmittingKyc(false); }
+  };
+
+  const upgradeToPro = async () => {
+    if (!driver) return;
+    setSubscribing(true);
+    try {
+      const res = await api.post('/subscriptions/checkout', { driverId: driver.id });
+      if (res.data.checkoutUrl) {
+        window.location.href = res.data.checkoutUrl;
+      } else {
+        fetchAll();
+      }
+    } catch {} finally { setSubscribing(false); }
   };
 
   if (loading) {
@@ -59,8 +123,8 @@ export default function DriverProfile() {
     );
   }
 
-  const kycColor = driver?.kycStatus === 'VERIFIED' ? 'text-green-400' : driver?.kycStatus === 'REJECTED' ? 'text-red-400' : 'text-yellow-400';
-  const kycLabel = driver?.kycStatus === 'VERIFIED' ? 'Verified' : driver?.kycStatus === 'REJECTED' ? 'Rejected' : 'Pending Review';
+  const kycColor = kycData?.kycStatus === 'VERIFIED' ? 'text-green-400' : kycData?.kycStatus === 'REJECTED' ? 'text-red-400' : 'text-yellow-400';
+  const kycLabel = kycData?.kycStatus === 'VERIFIED' ? 'Verified' : kycData?.kycStatus === 'REJECTED' ? 'Rejected' : kycData?.kycStatus === 'PENDING_REVIEW' ? 'Pending Review' : 'Not Submitted';
 
   return (
     <div className="space-y-4">
@@ -76,6 +140,115 @@ export default function DriverProfile() {
         </div>
       </div>
 
+      {/* Subscription card */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Crown size={18} className="text-triq-yellow" />
+          <h3 className="text-sm font-semibold text-white">Subscription</h3>
+        </div>
+        {driver?.subscriptionTier === 'PRO' ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-triq-yellow font-bold text-sm">PRO Active</p>
+              <p className="text-xs text-gray-400">Rebook perk enabled · ₱50/month</p>
+            </div>
+            <span className="px-2 py-1 rounded-lg bg-triq-yellow/20 text-triq-yellow text-xs font-bold">PRO</span>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs text-gray-400">Upgrade to PRO for ₱50/month to enable the rebook perk — passengers can request you specifically.</p>
+            <button
+              onClick={upgradeToPro}
+              disabled={subscribing}
+              className="w-full h-10 rounded-lg bg-triq-yellow text-triq-dark font-bold text-sm disabled:opacity-40"
+            >
+              {subscribing ? 'Processing...' : 'Upgrade to PRO — ₱50/month'}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* KYC card */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Shield size={18} className="text-triq-cyan" />
+          <h3 className="text-sm font-semibold text-white">KYC Verification</h3>
+        </div>
+        <div className="flex items-center justify-between">
+          <p className={`text-sm ${kycColor}`}>{kycLabel}</p>
+          {kycData?.kycStatus !== 'VERIFIED' && !showKycForm && (
+            <button
+              onClick={() => setShowKycForm(true)}
+              className="px-3 py-1.5 rounded-lg bg-triq-cyan/20 text-triq-cyan text-xs font-medium"
+            >
+              {kycData?.kycStatus === 'REJECTED' ? 'Re-submit' : 'Submit KYC'}
+            </button>
+          )}
+        </div>
+        {kycData?.kycRejectionReason && (
+          <p className="text-xs text-red-400">Reason: {kycData.kycRejectionReason}</p>
+        )}
+        {kycData?.documents && kycData.documents.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs text-gray-500 uppercase tracking-wider">Submitted Documents</p>
+            {kycData.documents.map((doc) => (
+              <div key={doc.id} className="flex items-center justify-between text-xs">
+                <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-triq-cyan hover:underline">
+                  {doc.type.replace(/_/g, ' ')}
+                </a>
+                <span className={doc.status === 'APPROVED' ? 'text-green-400' : doc.status === 'REJECTED' ? 'text-red-400' : 'text-yellow-400'}>
+                  {doc.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* KYC submission form */}
+      {showKycForm && (
+        <div className="card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">Submit KYC Documents</h3>
+            <button onClick={() => setShowKycForm(false)} className="text-gray-400 hover:text-white"><X size={16} /></button>
+          </div>
+          <p className="text-xs text-gray-400">Upload your documents to a hosting service (e.g. Imgur, Google Drive) and paste the direct links below.</p>
+          {kycDocs.map((doc, idx) => (
+            <div key={idx} className="space-y-2">
+              <select
+                value={doc.type}
+                onChange={(e) => setKycDocs((prev) => prev.map((d, i) => i === idx ? { ...d, type: e.target.value } : d))}
+                className="w-full h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+              >
+                <option value="">Select document type...</option>
+                {DRIVER_DOC_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <input
+                type="url"
+                value={doc.url}
+                onChange={(e) => setKycDocs((prev) => prev.map((d, i) => i === idx ? { ...d, url: e.target.value } : d))}
+                placeholder="https://example.com/document.jpg"
+                className="w-full h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => setKycDocs((prev) => [...prev, { type: '', url: '' }])}
+            className="text-xs text-triq-cyan font-medium"
+          >
+            + Add another document
+          </button>
+          <button
+            onClick={submitKyc}
+            disabled={submittingKyc || !kycDocs.some((d) => d.type && d.url)}
+            className="w-full h-10 rounded-lg bg-green-500 text-white font-bold text-sm disabled:opacity-40"
+          >
+            {submittingKyc ? 'Submitting...' : 'Submit for Review'}
+          </button>
+        </div>
+      )}
+
+      {/* Basic info */}
       <div className="card p-4 space-y-3">
         <div className="flex items-center gap-3">
           <Phone size={18} className="text-triq-cyan" />
@@ -98,13 +271,6 @@ export default function DriverProfile() {
             <p className="text-white text-sm">{driver && driver.rating > 0 ? `${driver.rating.toFixed(1)} (${driver.totalRides} rides)` : 'No ratings yet'}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Shield size={18} className="text-triq-cyan" />
-          <div>
-            <p className="text-xs text-gray-400">KYC Status</p>
-            <p className={`text-sm ${kycColor}`}>{kycLabel}</p>
-          </div>
-        </div>
         {driver?.status && (
           <div className="flex items-center gap-3">
             <Car size={18} className="text-triq-cyan" />
@@ -115,6 +281,31 @@ export default function DriverProfile() {
           </div>
         )}
       </div>
+
+      {/* Badges & Points */}
+      {badgeData && (badgeData.badges.length > 0 || badgeData.totalPoints > 0) && (
+        <div className="card p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Award size={18} className="text-triq-yellow" />
+            <h3 className="text-sm font-semibold text-white">Badges & Points</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <Zap size={16} className="text-triq-yellow" />
+            <span className="text-2xl font-bold text-triq-yellow">{badgeData.totalPoints}</span>
+            <span className="text-xs text-gray-400">total points</span>
+          </div>
+          {badgeData.badges.length > 0 && (
+            <div className="space-y-1">
+              {badgeData.badges.map((b) => (
+                <div key={b.id} className="flex items-center gap-2 text-xs">
+                  <span className="text-triq-yellow font-medium">{b.badge.name}</span>
+                  <span className="text-gray-500">{b.badge.description}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Pickup radius setting */}
       <div className="card p-4 space-y-3">

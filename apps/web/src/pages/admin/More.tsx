@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
-import { ShieldAlert, AlertTriangle, Settings, X } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Settings, X, ThumbsUp, ThumbsDown, MessageSquare } from 'lucide-react';
 
-type Tab = 'strikes' | 'emergencies' | 'config';
+type Tab = 'strikes' | 'emergencies' | 'config' | 'thumbs' | 'feedback';
 
 interface Strike {
   id: string;
@@ -39,11 +39,39 @@ interface Config {
   updatedAt: string;
 }
 
+interface ThumbsAnalytics {
+  driverThumbs: { up: number; down: number };
+  passengerThumbs: { up: number; down: number };
+  topDrivers: { id: string; name: string; plateNumber: string; totalThumbs: number }[];
+  topPassengers: { id: string; name: string; totalFeedback: number }[];
+}
+
+interface PassengerFeedback {
+  id: string;
+  thumbsUp: boolean;
+  comment: string | null;
+  createdAt: string;
+  from: { name: string; plateNumber: string };
+  to: { name: string };
+  ride: { id: string; pickupAddress: string; dropoffAddress: string };
+}
+
+interface FeedbackData {
+  feedback: PassengerFeedback[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
 export default function AdminMore() {
   const [tab, setTab] = useState<Tab>('strikes');
   const [strikes, setStrikes] = useState<Strike[]>([]);
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [configs, setConfigs] = useState<Config[]>([]);
+  const [thumbsData, setThumbsData] = useState<ThumbsAnalytics | null>(null);
+  const [feedbackData, setFeedbackData] = useState<FeedbackData | null>(null);
+  const [feedbackPage, setFeedbackPage] = useState(1);
+  const [feedbackFilter, setFeedbackFilter] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [resolveModal, setResolveModal] = useState<Emergency | null>(null);
   const [resolveNotes, setResolveNotes] = useState('');
@@ -60,13 +88,23 @@ export default function AdminMore() {
         .then((res) => setEmergencies(res.data.events))
         .catch(() => {})
         .finally(() => setLoading(false));
+    } else if (tab === 'thumbs') {
+      api.get('/admin/thumbs-analytics')
+        .then((res) => setThumbsData(res.data))
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    } else if (tab === 'feedback') {
+      api.get('/admin/passenger-feedback', { params: { page: feedbackPage, thumbsUp: feedbackFilter } })
+        .then((res) => setFeedbackData(res.data))
+        .catch(() => {})
+        .finally(() => setLoading(false));
     } else {
       api.get('/admin/config')
         .then((res) => setConfigs(res.data.configs))
         .catch(() => {})
         .finally(() => setLoading(false));
     }
-  }, [tab]);
+  }, [tab, feedbackPage, feedbackFilter]);
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -102,6 +140,8 @@ export default function AdminMore() {
         {[
           { key: 'strikes' as Tab, label: 'Strikes', icon: ShieldAlert },
           { key: 'emergencies' as Tab, label: 'Emergencies', icon: AlertTriangle },
+          { key: 'thumbs' as Tab, label: 'Thumbs', icon: ThumbsUp },
+          { key: 'feedback' as Tab, label: 'Feedback', icon: MessageSquare },
           { key: 'config' as Tab, label: 'Config', icon: Settings },
         ].map((t) => {
           const Icon = t.icon;
@@ -189,6 +229,144 @@ export default function AdminMore() {
             ))}
           </div>
         )
+      ) : tab === 'thumbs' ? (
+        !thumbsData ? (
+          <div className="card p-6 text-center">
+            <ThumbsUp size={32} className="text-gray-600 mx-auto mb-2" />
+            <p className="text-white font-semibold">No data available</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="card p-3">
+                <p className="text-xs text-gray-400 mb-2">Driver Thumbs (Passenger → Driver)</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <ThumbsUp size={14} className="text-green-400" />
+                    <span className="text-green-400 font-bold text-sm">{thumbsData.driverThumbs.up}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <ThumbsDown size={14} className="text-red-400" />
+                    <span className="text-red-400 font-bold text-sm">{thumbsData.driverThumbs.down}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="card p-3">
+                <p className="text-xs text-gray-400 mb-2">Passenger Thumbs (Driver → Passenger)</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <ThumbsUp size={14} className="text-green-400" />
+                    <span className="text-green-400 font-bold text-sm">{thumbsData.passengerThumbs.up}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <ThumbsDown size={14} className="text-red-400" />
+                    <span className="text-red-400 font-bold text-sm">{thumbsData.passengerThumbs.down}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {thumbsData.topDrivers.length > 0 && (
+              <div className="card p-3 space-y-2">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">Top Drivers by Thumbs</p>
+                {thumbsData.topDrivers.map((d, i) => (
+                  <div key={d.id} className="flex items-center justify-between text-xs">
+                    <span className="text-white">{i + 1}. {d.name} ({d.plateNumber})</span>
+                    <span className="text-triq-yellow font-bold">{d.totalThumbs}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {thumbsData.topPassengers.length > 0 && (
+              <div className="card p-3 space-y-2">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">Top Passengers by Feedback</p>
+                {thumbsData.topPassengers.map((p, i) => (
+                  <div key={p.id} className="flex items-center justify-between text-xs">
+                    <span className="text-white">{i + 1}. {p.name}</span>
+                    <span className="text-triq-yellow font-bold">{p.totalFeedback}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      ) : tab === 'feedback' ? (
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setFeedbackFilter(undefined); setFeedbackPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${!feedbackFilter ? 'bg-triq-cyan/20 text-triq-cyan' : 'bg-triq-light/10 text-gray-400'}`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => { setFeedbackFilter('true'); setFeedbackPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${feedbackFilter === 'true' ? 'bg-green-500/20 text-green-400' : 'bg-triq-light/10 text-gray-400'}`}
+            >
+              Thumbs Up
+            </button>
+            <button
+              onClick={() => { setFeedbackFilter('false'); setFeedbackPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${feedbackFilter === 'false' ? 'bg-red-500/20 text-red-400' : 'bg-triq-light/10 text-gray-400'}`}
+            >
+              Thumbs Down
+            </button>
+          </div>
+          {loading ? (
+            <div className="flex items-center justify-center h-40">
+              <div className="w-8 h-8 border-2 border-triq-cyan/30 border-t-triq-cyan rounded-full animate-spin" />
+            </div>
+          ) : !feedbackData || feedbackData.feedback.length === 0 ? (
+            <div className="card p-6 text-center">
+              <MessageSquare size={32} className="text-gray-600 mx-auto mb-2" />
+              <p className="text-white font-semibold">No feedback found</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {feedbackData.feedback.map((fb) => (
+                  <div key={fb.id} className="card p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {fb.thumbsUp
+                          ? <ThumbsUp size={12} className="text-green-400" />
+                          : <ThumbsDown size={12} className="text-red-400" />}
+                        <span className="text-xs text-gray-400">
+                          {fb.from.name} ({fb.from.plateNumber}) → {fb.to.name}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-500">{formatDate(fb.createdAt)}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {fb.ride.pickupAddress} → {fb.ride.dropoffAddress}
+                    </div>
+                    {fb.comment && (
+                      <p className="text-xs text-gray-300 italic pt-1 border-t border-triq-light/10">"{fb.comment}"</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {feedbackData.pages > 1 && (
+                <div className="flex items-center justify-center gap-2 pt-2">
+                  <button
+                    onClick={() => setFeedbackPage((p) => Math.max(1, p - 1))}
+                    disabled={feedbackPage === 1}
+                    className="px-3 py-1.5 rounded-lg bg-triq-light/10 text-gray-300 text-sm disabled:opacity-30"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-sm text-gray-400">{feedbackPage} / {feedbackData.pages}</span>
+                  <button
+                    onClick={() => setFeedbackPage((p) => Math.min(feedbackData.pages, p + 1))}
+                    disabled={feedbackPage === feedbackData.pages}
+                    className="px-3 py-1.5 rounded-lg bg-triq-light/10 text-gray-300 text-sm disabled:opacity-30"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       ) : (
         <div className="space-y-2">
           {configs.length === 0 ? (

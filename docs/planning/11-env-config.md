@@ -57,6 +57,21 @@
 |----------|-------------|--------------|
 | `PAYMONGO_SECRET_KEY` | Secret API key for server-side | PayMongo Dashboard → Developers → API Keys |
 | `PAYMONGO_PUBLIC_KEY` | Public key (if needed for frontend) | PayMongo Dashboard → Developers → API Keys |
+| `PAYMONGO_WEBHOOK_SECRET` | Webhook signing secret for verifying PayMongo callbacks | PayMongo Dashboard → Developers → Webhooks → Create Webhook |
+
+**PayMongo Webhook URL** (copy this into PayMongo Dashboard → Developers → Webhooks):
+```
+https://triq.dpdns.org/api/v1/tips/webhook
+```
+
+**Setup Steps**:
+1. Go to https://dashboard.paymongo.com/
+2. Navigate to **Developers** → **API Keys** — copy your Secret Key (starts with `sk_`)
+3. Navigate to **Developers** → **Webhooks** → **Create Webhook**
+4. Set the URL to: `https://triq.dpdns.org/api/v1/tips/webhook`
+5. Select events: `source.chargeable`, `payment.paid`, `payment.failed`
+6. Copy the Webhook Secret (starts with `whsec_`)
+7. Add all three values to Render Dashboard → Environment
 
 ### Server Config
 
@@ -81,6 +96,9 @@ Set in Render Dashboard → Environment:
 | `JWT_SECRET` | (base64-encoded random secret) |
 | `FIREBASE_PROJECT_ID` | `triq-35908` |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | `/etc/secrets/firebase-service-account.json` |
+| `PAYMONGO_SECRET_KEY` | `sk_live_xxx` (or `sk_test_xxx` for test mode) |
+| `PAYMONGO_PUBLIC_KEY` | `pk_live_xxx` (or `pk_test_xxx` for test mode) |
+| `PAYMONGO_WEBHOOK_SECRET` | `whsec_xxx` (from PayMongo webhook settings) |
 
 ### Secret Files
 

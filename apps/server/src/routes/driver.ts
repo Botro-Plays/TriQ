@@ -282,6 +282,77 @@ router.get('/:id/earnings', async (req, res) => {
   }
 });
 
+// POST /api/v1/drivers/:id/kyc — submit KYC documents
+router.post('/:id/kyc', async (req, res) => {
+  try {
+    const { documents } = req.body;
+    if (!documents || !Array.isArray(documents) || documents.length === 0) {
+      res.status(400).json({ error: 'documents array is required' });
+      return;
+    }
+
+    const driver = await prisma.driver.findUnique({ where: { id: req.params.id } });
+    if (!driver) {
+      res.status(404).json({ error: 'Driver not found' });
+      return;
+    }
+
+    // Validate each document
+    for (const doc of documents) {
+      if (!doc.type || !doc.url) {
+        res.status(400).json({ error: 'Each document must have type and url' });
+        return;
+      }
+    }
+
+    // Create all document records
+    const created = await prisma.$transaction(
+      documents.map((doc: { type: string; url: string }) =>
+        prisma.document.create({
+          data: {
+            driverId: driver.id,
+            type: doc.type as any,
+            url: doc.url,
+            status: 'PENDING',
+          },
+        })
+      )
+    );
+
+    await prisma.driver.update({
+      where: { id: driver.id },
+      data: { kycStatus: 'PENDING_REVIEW' },
+    });
+
+    res.status(201).json({ documents: created });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to submit KYC', message: err.message });
+  }
+});
+
+// GET /api/v1/drivers/:id/kyc — get driver's KYC documents and status
+router.get('/:id/kyc', async (req, res) => {
+  try {
+    const driver = await prisma.driver.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, kycStatus: true, kycRejectionReason: true },
+    });
+    if (!driver) {
+      res.status(404).json({ error: 'Driver not found' });
+      return;
+    }
+
+    const documents = await prisma.document.findMany({
+      where: { driverId: driver.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ ...driver, documents });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get KYC status', message: err.message });
+  }
+});
+
 // GET /api/v1/drivers/:id/badges — earned badges
 router.get('/:id/badges', async (req, res) => {
   try {

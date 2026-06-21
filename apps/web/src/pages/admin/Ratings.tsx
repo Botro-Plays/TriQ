@@ -7,6 +7,8 @@ interface Review {
   rating: number;
   comment: string | null;
   thumbsUp: boolean | null;
+  isHidden: boolean;
+  hiddenReason: string | null;
   createdAt: string;
   from: { name: string };
   to: { name: string; plateNumber: string };
@@ -26,6 +28,9 @@ export default function AdminRatings() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [maxRating, setMaxRating] = useState(0);
+  const [showHidden, setShowHidden] = useState(false);
+  const [hiding, setHiding] = useState<string | null>(null);
+  const [hideReason, setHideReason] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -34,6 +39,22 @@ export default function AdminRatings() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [page, maxRating]);
+
+  const hideReview = async (id: string) => {
+    try {
+      await api.post(`/admin/ratings/${id}/hide`, { reason: hideReason || undefined });
+      setHiding(null);
+      setHideReason('');
+      setData((prev) => prev ? { ...prev, reviews: prev.reviews.map((r) => r.id === id ? { ...r, isHidden: true } : r) } : prev);
+    } catch {}
+  };
+
+  const unhideReview = async (id: string) => {
+    try {
+      await api.post(`/admin/ratings/${id}/unhide`);
+      setData((prev) => prev ? { ...prev, reviews: prev.reviews.map((r) => r.id === id ? { ...r, isHidden: false } : r) } : prev);
+    } catch {}
+  };
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -74,6 +95,12 @@ export default function AdminRatings() {
         >
           Mid (1-3★)
         </button>
+        <button
+          onClick={() => setShowHidden((v) => !v)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium ${showHidden ? 'bg-red-500/20 text-red-400' : 'bg-triq-light/10 text-gray-400'}`}
+        >
+          {showHidden ? 'Showing Hidden' : 'Show Hidden'}
+        </button>
       </div>
 
       {loading ? (
@@ -88,8 +115,8 @@ export default function AdminRatings() {
       ) : (
         <>
           <div className="space-y-2">
-            {data.reviews.map((rev) => (
-              <div key={rev.id} className="card p-3 space-y-2">
+            {data.reviews.filter((r) => showHidden || !r.isHidden).map((rev) => (
+              <div key={rev.id} className={`card p-3 space-y-2 ${rev.isHidden ? 'opacity-50 border-red-500/20' : ''}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="flex gap-0.5">
@@ -102,6 +129,7 @@ export default function AdminRatings() {
                         ? <ThumbsUp size={12} className="text-green-400" />
                         : <ThumbsDown size={12} className="text-red-400" />
                     )}
+                    {rev.isHidden && <span className="text-[10px] text-red-400 font-bold">HIDDEN</span>}
                   </div>
                   <span className="text-xs text-gray-500">{formatDate(rev.createdAt)}</span>
                 </div>
@@ -113,6 +141,46 @@ export default function AdminRatings() {
                 </div>
                 {rev.comment && (
                   <p className="text-xs text-gray-300 italic pt-1 border-t border-triq-light/10">"{rev.comment}"</p>
+                )}
+                {/* Moderation buttons */}
+                {rev.isHidden ? (
+                  <button
+                    onClick={() => unhideReview(rev.id)}
+                    className="w-full h-7 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 text-xs font-medium"
+                  >
+                    Unhide Review
+                  </button>
+                ) : hiding === rev.id ? (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={hideReason}
+                      onChange={(e) => setHideReason(e.target.value)}
+                      placeholder="Reason for hiding (optional)"
+                      className="w-full h-8 px-2 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-xs"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => hideReview(rev.id)}
+                        className="flex-1 h-7 rounded-lg bg-red-500 text-white text-xs font-bold"
+                      >
+                        Confirm Hide
+                      </button>
+                      <button
+                        onClick={() => { setHiding(null); setHideReason(''); }}
+                        className="h-7 px-3 rounded-lg border border-triq-light/30 text-gray-400 text-xs"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setHiding(rev.id)}
+                    className="w-full h-7 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 text-xs font-medium"
+                  >
+                    Hide Review
+                  </button>
                 )}
               </div>
             ))}
