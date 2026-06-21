@@ -448,6 +448,30 @@ router.post('/:id/cancel', async (req, res) => {
       data: { rideId: ride.id, status: 'CANCELLED', note: reason, actor: 'USER' },
     });
 
+    // Push: notify the other party about cancellation
+    if (ride.driverId) {
+      // Passenger cancelled → notify driver
+      const drv = await prisma.driver.findUnique({ where: { id: ride.driverId }, select: { fcmToken: true } as any }) as any;
+      if (drv?.fcmToken) {
+        await sendPush(drv.fcmToken, {
+          title: '❌ Ride Cancelled',
+          body: 'The passenger has cancelled the ride request.',
+          data: { rideId: ride.id, type: 'CANCELLED' },
+        });
+      }
+    }
+    if (ride.passengerId) {
+      // Driver cancelled → notify passenger
+      const pass = await prisma.passenger.findUnique({ where: { id: ride.passengerId }, select: { fcmToken: true } as any }) as any;
+      if (pass?.fcmToken) {
+        await sendPush(pass.fcmToken, {
+          title: '❌ Ride Cancelled',
+          body: 'The driver has cancelled the ride. Please request a new one.',
+          data: { rideId: ride.id, type: 'CANCELLED' },
+        });
+      }
+    }
+
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to cancel ride', message: err.message });
@@ -476,6 +500,18 @@ router.post('/:id/arriving', async (req, res) => {
       data: { rideId: ride.id, status: 'ARRIVING', actor: 'DRIVER' },
     });
 
+    // Push: notify passenger that driver is arriving
+    if (ride.passengerId) {
+      const pass = await prisma.passenger.findUnique({ where: { id: ride.passengerId }, select: { fcmToken: true } as any }) as any;
+      if (pass?.fcmToken) {
+        await sendPush(pass.fcmToken, {
+          title: '🛺 Driver is Arriving!',
+          body: 'Your driver is on the way to your pickup location.',
+          data: { rideId: ride.id, type: 'ARRIVING' },
+        });
+      }
+    }
+
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to update ride', message: err.message });
@@ -503,6 +539,18 @@ router.post('/:id/start', async (req, res) => {
     await prisma.rideStatus.create({
       data: { rideId: ride.id, status: 'IN_PROGRESS', actor: 'DRIVER' },
     });
+
+    // Push: notify passenger that ride has started
+    if (ride.passengerId) {
+      const pass = await prisma.passenger.findUnique({ where: { id: ride.passengerId }, select: { fcmToken: true } as any }) as any;
+      if (pass?.fcmToken) {
+        await sendPush(pass.fcmToken, {
+          title: '🚀 Ride Started',
+          body: 'Your ride is now in progress. Enjoy the trip!',
+          data: { rideId: ride.id, type: 'STARTED' },
+        });
+      }
+    }
 
     res.json(updated);
   } catch (err: any) {
@@ -536,6 +584,18 @@ router.post('/:id/complete', async (req, res) => {
     await prisma.rideStatus.create({
       data: { rideId: ride.id, status: 'COMPLETED', actor: 'DRIVER' },
     });
+
+    // Push: notify passenger that ride is complete
+    if (ride.passengerId) {
+      const pass = await prisma.passenger.findUnique({ where: { id: ride.passengerId }, select: { fcmToken: true } as any }) as any;
+      if (pass?.fcmToken) {
+        await sendPush(pass.fcmToken, {
+          title: '✅ Ride Complete!',
+          body: `Fare: ₱${((finalFare || ride.estimatedFare) / 100).toFixed(0)}. Please rate your driver.`,
+          data: { rideId: ride.id, type: 'COMPLETED' },
+        });
+      }
+    }
 
     // Update driver stats
     if (ride.driverId) {
@@ -590,6 +650,18 @@ router.post('/:id/counter-offer', async (req, res) => {
       data: { rideId: ride.id, status: 'COUNTER_OFFERED', note: `Fare: ₱${fare / 100}`, actor: 'DRIVER' },
     });
 
+    // Push: notify passenger about counter-offer
+    if (ride.passengerId) {
+      const pass = await prisma.passenger.findUnique({ where: { id: ride.passengerId }, select: { fcmToken: true } as any }) as any;
+      if (pass?.fcmToken) {
+        await sendPush(pass.fcmToken, {
+          title: '💬 Counter-Offer Received',
+          body: `Driver proposed ₱${(fare / 100).toFixed(0)}. Accept or reject within 5 minutes.`,
+          data: { rideId: ride.id, type: 'COUNTER_OFFER' },
+        });
+      }
+    }
+
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to create counter-offer', message: err.message });
@@ -627,6 +699,18 @@ router.post('/:id/counter-offer/accept', async (req, res) => {
       data: { rideId: ride.id, status: 'COUNTER_OFFER_ACCEPTED', actor: 'PASSENGER' },
     });
 
+    // Push: notify driver that passenger accepted their counter-offer
+    if (ride.counterOfferDriverId) {
+      const drv = await prisma.driver.findUnique({ where: { id: ride.counterOfferDriverId }, select: { fcmToken: true } as any }) as any;
+      if (drv?.fcmToken) {
+        await sendPush(drv.fcmToken, {
+          title: '✅ Counter-Offer Accepted!',
+          body: 'The passenger accepted your fare. Head to the pickup location.',
+          data: { rideId: ride.id, type: 'COUNTER_ACCEPTED' },
+        });
+      }
+    }
+
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to accept counter-offer', message: err.message });
@@ -660,6 +744,18 @@ router.post('/:id/counter-offer/reject', async (req, res) => {
     await prisma.rideStatus.create({
       data: { rideId: ride.id, status: 'COUNTER_OFFER_REJECTED', actor: 'PASSENGER' },
     });
+
+    // Push: notify driver that passenger rejected their counter-offer
+    if (ride.counterOfferDriverId) {
+      const drv = await prisma.driver.findUnique({ where: { id: ride.counterOfferDriverId }, select: { fcmToken: true } as any }) as any;
+      if (drv?.fcmToken) {
+        await sendPush(drv.fcmToken, {
+          title: '❌ Counter-Offer Rejected',
+          body: 'The passenger rejected your proposed fare.',
+          data: { rideId: ride.id, type: 'COUNTER_REJECTED' },
+        });
+      }
+    }
 
     res.json(updated);
   } catch (err: any) {
