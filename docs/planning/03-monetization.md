@@ -33,7 +33,7 @@ Drivers are the paying customers. Subscriptions are **monthly** and grant algori
 - No badge or highlight
 - Standard support (community/FAQ)
 
-### Pro Driver — **"TriQ Pro"** (₱50/month)
+### Pro Driver — **"TriQ Pro"** (₱50/month, admin-configurable)
 - **Featured / Recommended badge** on profile and in search
 - **Higher ranking** in "Nearby Drivers" list (appears first)
 - **Highlighted card** in passenger app (distinct color/border)
@@ -43,16 +43,18 @@ Drivers are the paying customers. Subscriptions are **monthly** and grant algori
 - **Exclusive Pro-only leaderboard badge flair** (gold border on rank)
 - **Rebook perk**: Passengers can rebook a ride directly with this driver (ride request visible only to this driver)
 
-> **Note**: Elite tier has been removed from the schema. Only FREE and PRO tiers are supported.
+> **Pricing is admin-configurable** via `/admin` → PayMongo Settings. Default: ₱50/month (5000 centavos). Stored in `SystemConfig` as `PAYMONGO_PRO_PRICE`. Changes take effect immediately without redeploy.
 
-### ~~Elite Driver — "TriQ Elite" (₱99/month)~~ — REMOVED
-- ~~Everything in Pro~~
-- ~~"Top Rated" or "Elite" badge~~
-- ~~Guaranteed top-3 placement in nearby searches~~
-- ~~Exclusive "Elite Driver" filter passengers can toggle~~
-- ~~Priority matching + guaranteed top-3 placement in all conditions~~
-- ~~Monthly performance report + tips for maximizing earnings~~
-- ~~Elite-only seasonal challenge eligibility~~ (bigger prizes, free Elite for 1 month)
+### Elite Driver — **"TriQ Elite"** (₱99/month, admin-configurable)
+- Everything in Pro
+- "Top Rated" or "Elite" badge
+- Guaranteed top-3 placement in nearby searches
+- Exclusive "Elite Driver" filter passengers can toggle
+- Priority matching + guaranteed top-3 placement in all conditions
+- Monthly performance report + tips for maximizing earnings
+- Elite-only seasonal challenge eligibility (bigger prizes, free Elite for 1 month)
+
+> **Pricing is admin-configurable** via `/admin` → PayMongo Settings. Default: ₱99/month (9900 centavos). Stored in `SystemConfig` as `PAYMONGO_ELITE_PRICE`. Changes take effect immediately without redeploy.
 
 ### Subscription Lifecycle
 ```
@@ -73,11 +75,17 @@ Driver signs up ──► Free Pro Trial (7 days, tracked in Subscription as `is
 ```
 
 ### Payment Handling
-- **Gateway**: PayMongo (Philippines-local, supports GCash, Maya, cards)
-- **Model**: Subscription via PayMongo Checkout Sessions or Payment Links
-- **Webhooks**: Node.js API listens for `payment.paid`, `payment.failed`, `subscription.ended`
+- **Gateway**: PayMongo (Philippines-local, supports GCash, Maya, Card, QRPH)
+- **Model**: Subscription via PayMongo Checkout sessions (Checkout Sessions API)
+- **Payment methods**: `gcash`, `paymaya`, `card`, `qrph`
+- **Webhooks**: Node.js API listens for `payment.paid`, `payment.failed`, `qrph.expired`, `qr.paid`, `qr.expired`, `link.payment.paid`
+- **Webhook signature verification**: HMAC-SHA256 over `timestamp.rawBody` using PayMongo webhook secret. Header format: `t=TIMESTAMP,te=HMAC` (test) or `t=TIMESTAMP,li=HMAC` (live)
+- **Payment matching**: Checkout sessions store `payment_intent_id` (from `session.data.attributes.payment_intent.id`) as `paymongoId` on the Tip/Subscription record. The `payment.paid` webhook carries `payment_intent_id` in `event.data.attributes.data.attributes.payment_intent_id`, which is used to match back to the record.
+- **Raw body capture**: `express.raw({ type: 'application/json' })` applied to webhook route to preserve exact bytes for signature verification
+- **Route ordering**: Webhook route registered before auth-protected `/tips` route to avoid JWT middleware blocking PayMongo's unauthenticated requests
 - **Grace Period**: 3-day grace if auto-renew fails before reverting to Free
 - **No Escrow**: All ride fares are cash-only, paid directly by passenger to driver. Platform never holds ride money.
+- **Dev mode**: When `PAYMONGO_SECRET_KEY` not configured, subscriptions activate immediately without payment (for development/testing)
 
 ---
 
@@ -119,7 +127,7 @@ Platform revenue recorded (Tip)
 
 ## 3. Revenue Projections (Illustrative)
 
-Assuming 100 active drivers after 6 months:
+Assuming 100 active drivers after 6 months (using default prices — admin can adjust):
 - 60 Free drivers = ₱0/mo
 - 30 Pro drivers (₱50/mo) = ₱1,500/mo
 - 10 Elite drivers (₱99/mo) = ₱990/mo

@@ -118,7 +118,8 @@
 | Emergency events | ✅ | `GET /api/v1/admin/emergencies` — paginated |
 | System config list | ✅ | `GET /api/v1/admin/config` — all key-value entries |
 | Update config | ✅ | `PATCH /api/v1/admin/config/:key` — update value |
-| Hide review (moderation) | ✅ | `POST /api/v1/admin/ratings/:id/hide` — soft-hide review with reason |
+| PayMongo config (GET) | ✅ | `GET /api/v1/admin/paymongo` — returns masked API keys, webhook URL, `proSubscriptionPrice`, `eliteSubscriptionPrice` (centavos) |
+| PayMongo config (PUT) | ✅ | `PUT /api/v1/admin/paymongo` — saves secret key, public key, webhook secret, PRO price, ELITE price to SystemConfig. Prices converted to centavos, minimum ₱100 enforced |
 | Unhide review | ✅ | `POST /api/v1/admin/ratings/:id/unhide` — restore hidden review |
 | Thumbs analytics | ✅ | `GET /api/v1/admin/thumbs-analytics` — aggregate thumbs up/down stats, top drivers/passengers |
 | Passenger feedback list | ✅ | `GET /api/v1/admin/passenger-feedback` — all driver→passenger feedback, paginated with thumbs filter |
@@ -132,14 +133,15 @@
 ### 1.9 Tips (`src/routes/tip.ts`)
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Create platform tip | ✅ | `POST /api/v1/tips` — creates tip, initiates PayMongo checkout (GCash/Maya/Card) |
-| PayMongo webhook | ✅ | `POST /api/v1/tips/webhook` — public endpoint, updates tip status on payment |
+| Create platform tip | ✅ | `POST /api/v1/tips` — creates tip, initiates PayMongo checkout (GCash/Maya/Card/QRPH). Stores `payment_intent_id` as `paymongoId` for webhook matching |
+| PayMongo webhook | ✅ | `POST /api/v1/tips/webhook` — public endpoint (no auth), `express.raw` for raw body, HMAC-SHA256 signature verification over `timestamp.rawBody`, matches by `payment_intent_id` |
 | Check tip status | ✅ | `GET /api/v1/tips/:id/status` |
 
 ### 1.10 Subscriptions (`src/routes/subscription.ts`)
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Subscription checkout | ✅ | `POST /api/v1/subscriptions/checkout` — initiates PayMongo checkout for PRO (₱50/month) |
+| Subscription checkout | ✅ | `POST /api/v1/subscriptions/checkout` — accepts `tier` param (`PRO` or `ELITE`), reads price from `SystemConfig` (`PAYMONGO_PRO_PRICE` / `PAYMONGO_ELITE_PRICE`), initiates PayMongo checkout (GCash/Maya/Card/QRPH). Stores `payment_intent_id` as `paymongoId` for webhook matching |
+| Get subscription prices | ✅ | `GET /api/v1/subscriptions/price` — returns `{ pro: {centavos,php}, elite: {centavos,php} }` from SystemConfig |
 | Subscription history | ✅ | `GET /api/v1/subscriptions/:driverId` — recent subscriptions |
 
 ### 1.11 Reports (`src/routes/report.ts`)
@@ -205,7 +207,7 @@
 | Passenger Leaderboard | ✅ | `src/pages/shared/Leaderboard.tsx` | This Week / This Month / All Time tabs, rides/tips/ratings metrics |
 | Driver Home | ✅ | `src/pages/driver/Home.tsx` | Online toggle, pending rides, active ride, counter-offer, rebook badge, post-ride passenger feedback modal (thumbs up/down) |
 | Driver Earnings | ✅ | `src/pages/driver/Earnings.tsx` | Daily/weekly/monthly/all-time earnings |
-| Driver Profile | ✅ | `src/pages/driver/Profile.tsx` | Profile with subscription status |
+| Driver Profile | ✅ | `src/pages/driver/Profile.tsx` | Profile with subscription status (PRO/ELITE upgrade cards, dynamic pricing from `/subscriptions/price`) |
 | Driver Leaderboard | ✅ | `src/pages/shared/Leaderboard.tsx` | This Week / This Month / All Time tabs, rides/earnings/rating metrics |
 | Admin Dashboard | ✅ | `src/pages/admin/Dashboard.tsx` | Stats grid with total fares, subscription + tip revenue, tier breakdown |
 | Admin KYC Queue | ✅ | `src/pages/admin/KycQueue.tsx` | Document review with approve/reject |
@@ -216,7 +218,7 @@
 | Admin Tips | ✅ | `src/pages/admin/Tips.tsx` | Tip transaction log |
 | Admin Passengers | ✅ | `src/pages/admin/Passengers.tsx` | Passenger list with suspend/reinstate |
 | Admin Ratings | ✅ | `src/pages/admin/Ratings.tsx` | Ratings list with filter |
-| Admin More | ✅ | `src/pages/admin/More.tsx` | Strikes, emergencies, system config tabs |
+| Admin PayMongo Settings | ✅ | `src/pages/admin/PayMongo.tsx` | API key configuration, webhook URL, PRO & ELITE subscription price fields (₱/month, admin-configurable) |
 
 ### 2.3 Components
 | Feature | Status | File | Notes |
@@ -267,14 +269,14 @@ Users can:
 
 ## 5. Key Architectural Decisions
 
-- **Monetization**: Driver subscriptions (FREE/PRO) + passenger tips — platform never handles ride fares (cash-only, direct passenger→driver)
-- **Rebook as subscription perk**: Only available if original driver has ACTIVE subscription; ride request visible only to the preferred driver
+- **Monetization**: Driver subscriptions (FREE/PRO/ELITE) + passenger tips — platform never handles ride fares (cash-only, direct passenger→driver). Subscription prices are admin-configurable via `/admin` → PayMongo Settings, stored in `SystemConfig` (`PAYMONGO_PRO_PRICE`, `PAYMONGO_ELITE_PRICE`), take effect immediately without redeploy
+- **Rebook as subscription perk**: Only available if original driver has ACTIVE PRO or ELITE subscription; ride request visible only to the preferred driver
 - **Leaderboards**: Computed via aggregation queries (no pre-computed rank column), supports week/month/alltime periods. Both drivers and passengers can see both leaderboards via Drivers/Passengers toggle. Passenger "ratings" metric uses driver thumbs-up approval rate.
 - **Driver→Passenger feedback**: After completing a ride, drivers can give thumbs up/down to the passenger. One feedback per ride. Used for passenger leaderboard approval rate metric.
-- **Subscription tiers**: Only FREE and PRO (ELITE removed from schema)
+- **Subscription tiers**: FREE, PRO (₱50/mo default), and ELITE (₱99/mo default) — both paid tiers admin-configurable via SystemConfig
 - **Admin earnings**: Shows subscription revenue + tip revenue (not ride fares, which are driver cash earnings)
 - **Total fares card**: Shows sum of finalFare from completed rides (driver cash earnings audit, not platform revenue)
 - **Auth middleware**: JWT verification on all API routes except /auth and /health. Admin routes require OWNER or STAFF role.
 - **Socket.io**: JWT-authenticated, room-based (user:userId). Real-time events for ride requests, cancellations, counter-offers, and driver location broadcasting. Rebook rides only sent to preferred driver.
-- **PayMongo integration**: Tips and PRO subscriptions use PayMongo checkout (GCash/Maya/Card). Webhook endpoint is public (no auth). Falls back to dev mode (PENDING/ACTIVE without payment) when PAYMONGO_SECRET not configured.
+- **PayMongo integration**: Tips and subscriptions (PRO/ELITE) use PayMongo checkout (GCash/Maya/Card/QRPH). Webhook endpoint is public (no auth), uses `express.raw` for raw body capture, HMAC-SHA256 signature verification over `timestamp.rawBody`. Payment matching via `payment_intent_id` stored as `paymongoId` on Tip/Subscription records. Falls back to dev mode (PENDING/ACTIVE without payment) when `PAYMONGO_SECRET_KEY` not configured. Admin can configure API keys, webhook secret, and subscription prices via `/admin` → PayMongo Settings.
 - **Gamification**: Badges, points, and seasonal challenges endpoints implemented. Points award endpoint for internal use by ride completion/rating flows.

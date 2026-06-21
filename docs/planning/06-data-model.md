@@ -40,7 +40,7 @@ enum UserRole { PASSENGER DRIVER OWNER STAFF }
 enum KycStatus { UNVERIFIED PENDING_REVIEW VERIFIED REJECTED }
 enum DriverStatus { PENDING VERIFIED SUSPENDED }
 enum SubscriptionTier { FREE PRO ELITE }
-enum SubscriptionStatus { ACTIVE EXPIRED CANCELLED PAST_DUE }
+enum SubscriptionStatus { PENDING ACTIVE EXPIRED CANCELLED }
 enum RideStatusEnum { REQUESTED ACCEPTED ARRIVING STARTED COMPLETED CANCELLED COUNTER_OFFERED COUNTER_OFFER_ACCEPTED COUNTER_OFFER_REJECTED COUNTER_OFFER_EXPIRED }
 enum PaymentMethod { CASH GCASH MAYA CARD }
 enum DocumentType {
@@ -116,7 +116,14 @@ model Driver {
   pickupRadius      Int      @default(2000) // max pickup distance in meters (500-5000)
   expandedRadiusUntil DateTime? // temporary radius expansion expiry
   subscriptionTier  SubscriptionTier @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(ACTIVE)
   subscriptionExpiresAt DateTime?
+
+  // Driver stats (computed on ride completion)
+  totalEarnings     Int      @default(0) // centavos (estimated fares)
+  totalRides        Int      @default(0)
+  rating            Float    @default(5.0)
+  reviewCount       Int      @default(0)
 
   user              User          @relation(fields: [userId], references: [id])
   rides             Ride[]        @relation("DriverRides")
@@ -211,15 +218,18 @@ model RideStatus {
 
 model Tip {
   id            String   @id @default(uuid())
-  rideId        String   @unique
-  fromId        String   // passengerId
+  rideId        String?  @unique  // optional — standalone tips don't need a ride
+  passengerId   String?           // optional — who sent the tip
+  driverId      String?           // optional — driver being tipped (platform tip, not driver payout)
   amount        Int      // in centavos
+  paymongoId    String?  // PayMongo payment_intent_id for webhook matching
   status        String   @default("PENDING") // PENDING, PAID, FAILED
-  paymongoPaymentId String?
+  createdAt     DateTime @default(now())
   paidAt        DateTime?
 
-  ride          Ride     @relation(fields: [rideId], references: [id])
-  from          Passenger @relation("TipFrom", fields: [fromId], references: [id])
+  ride          Ride?      @relation(fields: [rideId], references: [id])
+  passenger     Passenger? @relation("TipFrom", fields: [passengerId], references: [id])
+  driver        Driver?    @relation("TipFromDriver", fields: [driverId], references: [id])
   // Note: Tips go to the platform (TriQ), not to the driver
 }
 

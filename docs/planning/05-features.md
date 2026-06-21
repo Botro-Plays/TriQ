@@ -141,7 +141,7 @@
 - [ ] Toggle online/offline status
 - [ ] Earnings summary (today, this week, this month)
 - [ ] Subscription status banner (Free / Pro / Elite + expiry date)
-- [ ] Upgrade to Pro/Elite button → PayMongo checkout
+- [ ] Upgrade to Pro/Elite button → PayMongo checkout (prices admin-configurable)
 
 #### Map & Ride Requests
 - [ ] Interactive OSM map with current location
@@ -534,7 +534,7 @@ Public-facing marketing site served at root domain.
 12. **Web Passenger App (PWA)** — full ride booking via browser (no install required)
 
 **Phase 2 (Post-Launch):**
-- Driver subscription tiers (Pro/Elite)
+- Driver subscription tiers (Pro/Elite) with admin-configurable pricing
 - Passenger platform tipping via PayMongo
 - In-app reporting & disputes
 - Saved places for passengers
