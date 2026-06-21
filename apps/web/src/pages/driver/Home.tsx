@@ -67,6 +67,18 @@ export default function DriverHome() {
       .then((res) => {
         setDriverId(res.data.id);
         setIsOnline(res.data.isOnline);
+        // If already online, restore location from DB and restart location watch
+        if (res.data.isOnline && res.data.currentLat && res.data.currentLng) {
+          setLocation({ lat: res.data.currentLat, lng: res.data.currentLng });
+          const id = watchLocation(
+            (pos) => {
+              setLocation({ lat: pos.lat, lng: pos.lng });
+              api.patch(`/drivers/${res.data.id}/location`, { lat: pos.lat, lng: pos.lng }).catch(() => {});
+            },
+            (err) => { setError(err.message); },
+          );
+          watchIdRef.current = id;
+        }
       })
       .catch(() => {});
   }, [user]);
