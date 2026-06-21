@@ -75,7 +75,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
                 quantity: 1,
               },
             ],
-            payment_method_types: ['gcash', 'maya', 'card', 'qrph'],
+            payment_method_types: ['gcash', 'paymaya', 'card', 'qrph'],
             success_url: `${baseUrl}/driver?subscription=success`,
             failed_url: `${baseUrl}/driver?subscription=failed`,
           },

@@ -74,7 +74,7 @@ router.post('/', async (req: AuthRequest, res) => {
                 quantity: 1,
               },
             ],
-            payment_method_types: ['gcash', 'maya', 'card', 'qrph'],
+            payment_method_types: ['gcash', 'paymaya', 'card', 'qrph'],
             success_url: `${baseUrl}${redirectBase}?tip=success`,
             failed_url: `${baseUrl}${redirectBase}?tip=failed`,
           },
