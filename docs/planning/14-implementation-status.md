@@ -50,6 +50,7 @@
 | Ride history | ✅ | `GET /api/v1/passengers/:id/rides` — paginated, includes driver info, review, pickup/dropoff coords, driver subscription status |
 | Save favorite place | ✅ | `POST /api/v1/passengers/:id/places` — saves home/work location |
 | Submit KYC documents | ✅ | `POST /api/v1/passengers/:id/kyc` — creates Document record, sets kycStatus to PENDING_REVIEW |
+| Save FCM token (passenger) | ✅ | `PATCH /api/v1/passengers/:id/fcm-token` — saves Firebase push token |
 | Earned badges | ✅ | `GET /api/v1/passengers/:id/badges` — list with badge details |
 | Points history | ✅ | `GET /api/v1/passengers/:id/points` — list with total |
 | Saved places | ✅ | `GET /api/v1/passengers/:id/places` — list saved places |
@@ -65,7 +66,8 @@
 | Update pickup radius | ✅ | `PATCH /api/v1/drivers/:id/radius` — updates pickupRadius |
 | Ride history | ✅ | `GET /api/v1/drivers/:id/rides` — paginated with passenger info |
 | Earnings summary | ✅ | `GET /api/v1/drivers/:id/earnings` — today/week/month/all-time aggregates |
-| Find nearby drivers | ✅ | `GET /api/v1/drivers/nearby` — lat/lng/radius query with subscription tier sorting |
+| Find nearby drivers | ✅ | `GET /api/v1/drivers/nearby` — lat/lng/radius query; sorted ELITE→PRO→FREE, then by distance; ELITE gets 1.2× pickup radius bonus; returns `subscriptionTier`, `subscriptionStatus` |
+| Save FCM token (driver) | ✅ | `PATCH /api/v1/drivers/:id/fcm-token` — saves Firebase push token |
 | Earned badges | ✅ | `GET /api/v1/drivers/:id/badges` — list with badge details |
 | Points history | ✅ | `GET /api/v1/drivers/:id/points` — list with total |
 | Report passenger | ✅ | `POST /api/v1/drivers/:id/report-passenger` — driver reports passenger from their ride |
@@ -90,7 +92,7 @@
 | Emergency alert | ✅ | `POST /api/v1/rides/:id/emergency` — creates EmergencyEvent |
 | Submit review | ✅ | `POST /api/v1/rides/:id/review` — rating + thumbs up + comment, updates driver rating |
 | Driver→Passenger feedback | ✅ | `POST /api/v1/rides/:id/passenger-feedback` — driver gives thumbs up/down to passenger after completed ride |
-| Rebook (subscription perk) | ✅ | `preferredDriverId` field on Ride — only drivers with ACTIVE PRO subscription can be rebooked; ride only visible to preferred driver; only preferred driver can accept |
+| Rebook (subscription perk) | ✅ | `preferredDriverId` field on Ride — only drivers with ACTIVE PRO or ELITE subscription can be rebooked; ride only visible to preferred driver; push notification sent to preferred driver |
 
 ### 1.7 Admin Routes (`src/routes/admin.ts`)
 | Feature | Status | Notes |
@@ -207,7 +209,7 @@
 | Passenger Leaderboard | ✅ | `src/pages/shared/Leaderboard.tsx` | This Week / This Month / All Time tabs, rides/tips/ratings metrics |
 | Driver Home | ✅ | `src/pages/driver/Home.tsx` | Online toggle, pending rides, active ride, counter-offer, rebook badge, post-ride passenger feedback modal (thumbs up/down) |
 | Driver Earnings | ✅ | `src/pages/driver/Earnings.tsx` | Daily/weekly/monthly/all-time earnings |
-| Driver Profile | ✅ | `src/pages/driver/Profile.tsx` | Profile with subscription status (PRO/ELITE upgrade cards, dynamic pricing from `/subscriptions/price`) |
+| Driver Profile | ✅ | `src/pages/driver/Profile.tsx` | PRO/ELITE upgrade cards (side-by-side for FREE, upgrade-to-ELITE for PRO, active badge for ELITE), prices dynamic from `/subscriptions/price` |
 | Driver Leaderboard | ✅ | `src/pages/shared/Leaderboard.tsx` | This Week / This Month / All Time tabs, rides/earnings/rating metrics |
 | Admin Dashboard | ✅ | `src/pages/admin/Dashboard.tsx` | Stats grid with total fares, subscription + tip revenue, tier breakdown |
 | Admin KYC Queue | ✅ | `src/pages/admin/KycQueue.tsx` | Document review with approve/reject |
@@ -219,6 +221,8 @@
 | Admin Passengers | ✅ | `src/pages/admin/Passengers.tsx` | Passenger list with suspend/reinstate |
 | Admin Ratings | ✅ | `src/pages/admin/Ratings.tsx` | Ratings list with filter |
 | Admin PayMongo Settings | ✅ | `src/pages/admin/PayMongo.tsx` | API key configuration, webhook URL, PRO & ELITE subscription price fields (₱/month, admin-configurable) |
+| Passenger Home | ✅ | `src/pages/passenger/Home.tsx` | Nearby driver list shows PRO (cyan badge) and ELITE (yellow badge) with tier-based highlight cards; up to 5 shown |
+| Push Notifications (FCM) | ✅ | `src/hooks/useFCM.ts` + `public/firebase-messaging-sw.js` | Requests permission, gets token, saves to server. Background push via SW, foreground via Notification API. Requires `VITE_FIREBASE_VAPID_KEY`. |
 
 ### 2.3 Components
 | Feature | Status | File | Notes |
@@ -279,4 +283,6 @@ Users can:
 - **Auth middleware**: JWT verification on all API routes except /auth and /health. Admin routes require OWNER or STAFF role.
 - **Socket.io**: JWT-authenticated, room-based (user:userId). Real-time events for ride requests, cancellations, counter-offers, and driver location broadcasting. Rebook rides only sent to preferred driver.
 - **PayMongo integration**: Tips and subscriptions (PRO/ELITE) use PayMongo checkout (GCash/Maya/Card/QRPH). Webhook endpoint is public (no auth), uses `express.raw` for raw body capture, HMAC-SHA256 signature verification over `timestamp.rawBody`. Payment matching via `payment_intent_id` stored as `paymongoId` on Tip/Subscription records. Falls back to dev mode (PENDING/ACTIVE without payment) when `PAYMONGO_SECRET_KEY` not configured. Admin can configure API keys, webhook secret, and subscription prices via `/admin` → PayMongo Settings.
+- **FCM Push Notifications**: Firebase Cloud Messaging via `firebase-admin` (server) + `firebase/messaging` (client). Token saved per driver/passenger. Events: rebook request → driver, ride accepted → passenger, subscription activated → driver, tip paid → passenger. Background handled by `/firebase-messaging-sw.js` service worker. Requires `VITE_FIREBASE_VAPID_KEY` (generate in Firebase Console → Project Settings → Cloud Messaging → Web Push Certificates).
+- **Nearby sort**: ELITE → PRO → FREE (by tier weight), then by distance within each tier. ELITE gets 1.2× effective pickup radius (wider visibility).
 - **Gamification**: Badges, points, and seasonal challenges endpoints implemented. Points award endpoint for internal use by ride completion/rating flows.

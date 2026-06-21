@@ -34,27 +34,23 @@ Drivers are the paying customers. Subscriptions are **monthly** and grant algori
 - Standard support (community/FAQ)
 
 ### Pro Driver — **"TriQ Pro"** (₱50/month, admin-configurable)
-- **Featured / Recommended badge** on profile and in search
-- **Higher ranking** in "Nearby Drivers" list (appears first)
-- **Highlighted card** in passenger app (distinct color/border)
-- Priority matching when multiple drivers are equidistant
+- **"PRO" badge** (cyan) displayed on driver card in passenger nearby list
+- **Cyan highlighted card** in passenger nearby driver list
+- **Sorted above FREE drivers** in nearby results (by distance within tier)
+- **Rebook perk**: Passengers can request this driver directly — ride visible only to this driver; push notification sent to driver on rebook request
 - Access to earnings analytics dashboard
-- Priority support chat
-- **Exclusive Pro-only leaderboard badge flair** (gold border on rank)
-- **Rebook perk**: Passengers can rebook a ride directly with this driver (ride request visible only to this driver)
 
-> **Pricing is admin-configurable** via `/admin` → PayMongo Settings. Default: ₱50/month (5000 centavos). Stored in `SystemConfig` as `PAYMONGO_PRO_PRICE`. Changes take effect immediately without redeploy.
+> **Pricing is admin-configurable** via `/admin` → PayMongo Settings. Default: ₱50/month (5000 centavos), minimum ₱50. Stored in `SystemConfig` as `PAYMONGO_PRO_PRICE`.
 
 ### Elite Driver — **"TriQ Elite"** (₱99/month, admin-configurable)
-- Everything in Pro
-- "Top Rated" or "Elite" badge
-- Guaranteed top-3 placement in nearby searches
-- Exclusive "Elite Driver" filter passengers can toggle
-- Priority matching + guaranteed top-3 placement in all conditions
-- Monthly performance report + tips for maximizing earnings
-- Elite-only seasonal challenge eligibility (bigger prizes, free Elite for 1 month)
+- Everything in PRO, plus:
+- **"ELITE" badge** (yellow/gold) displayed on driver card in passenger nearby list
+- **Yellow highlighted card** — visually distinct from PRO
+- **Sorted FIRST** in nearby results — always above PRO and FREE drivers
+- **1.2× pickup radius bonus**: ELITE drivers appear in searches 20% beyond their set pickup radius, giving them wider visibility and more ride requests
+- Push notification when subscription activates (via PayMongo webhook)
 
-> **Pricing is admin-configurable** via `/admin` → PayMongo Settings. Default: ₱99/month (9900 centavos). Stored in `SystemConfig` as `PAYMONGO_ELITE_PRICE`. Changes take effect immediately without redeploy.
+> **Pricing is admin-configurable** via `/admin` → PayMongo Settings. Default: ₱99/month (9900 centavos), minimum ₱99. Stored in `SystemConfig` as `PAYMONGO_ELITE_PRICE`.
 
 ### Subscription Lifecycle
 ```
