@@ -190,7 +190,7 @@ router.get('/passengers', async (req, res) => {
         take: limit,
       });
 
-      const passengerIds = results.map((r) => r.passengerId);
+      const passengerIds = results.map((r) => r.passengerId).filter((id): id is string => id !== null);
       const passengers = await prisma.passenger.findMany({
         where: { id: { in: passengerIds } },
         select: { id: true, name: true, photoUrl: true, trustScore: true },
@@ -205,11 +205,11 @@ router.get('/passengers', async (req, res) => {
 
       res.json({
         entries: results.map((r, i) => ({
-          ...passengerMap.get(r.passengerId),
+          ...(r.passengerId ? passengerMap.get(r.passengerId) : undefined),
           rank: (page - 1) * limit + i + 1,
           score: r._sum.amount || 0,
           tipCount: r._count.id,
-        })).filter((e) => e.id),
+        })).filter((e) => e?.id),
         total: total.length,
         page,
         pages: Math.ceil(total.length / limit),

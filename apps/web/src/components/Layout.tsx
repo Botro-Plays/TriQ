@@ -102,7 +102,7 @@ export default function Layout() {
                 <Menu size={20} className="text-gray-300" />
               </button>
             )}
-            <Link to="/" className="flex items-center gap-2">
+            <Link to={role === 'PASSENGER' ? '/passenger' : role === 'DRIVER' ? '/driver' : '/admin'} className="flex items-center gap-2">
               <span className="text-lg font-extrabold text-triq-yellow tracking-tight">TriQ</span>
               <span className="text-[10px] font-semibold text-triq-cyan uppercase tracking-wider px-1.5 py-0.5 rounded bg-triq-cyan/10">
                 {ROLE_LABELS[role as UserRole]}
