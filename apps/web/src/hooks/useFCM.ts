@@ -65,17 +65,25 @@ export function useFCM() {
           }
         }
 
-        // Handle foreground messages (app is in focus — show in-app toast or browser notification)
-        onMessage(messaging, (payload) => {
+        // Handle foreground messages — use SW showNotification so it works even
+        // when the app tab is active (new Notification() is suppressed by Chrome)
+        onMessage(messaging, async (payload) => {
           console.log('[FCM] Foreground message received:', payload.notification?.title);
           const title = payload.notification?.title || 'TriQ';
           const body = payload.notification?.body || '';
           if (Notification.permission === 'granted') {
-            new Notification(title, {
-              body,
-              icon: '/icons/icon-192x192.png',
-              badge: '/icons/icon-72x72.png',
-            });
+            try {
+              const reg = await navigator.serviceWorker.ready;
+              reg.showNotification(title, {
+                body,
+                icon: '/icons/icon-192x192.png',
+                badge: '/icons/icon-72x72.png',
+                data: payload.data,
+                tag: 'triq-fcm',
+              });
+            } catch (e) {
+              console.warn('[FCM] showNotification failed:', e);
+            }
           }
         });
 

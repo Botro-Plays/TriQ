@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
-import { Users, Car, Wifi, Activity, CalendarCheck, CheckCircle, Coins, ShieldAlert, Ban, TrendingUp, Heart, CreditCard } from 'lucide-react';
+import { Users, Car, Wifi, Activity, CalendarCheck, CheckCircle, Coins, ShieldAlert, Ban, TrendingUp, Heart, CreditCard, Gift, Crown } from 'lucide-react';
 
 interface Stats {
   totalPassengers: number;
@@ -17,6 +17,9 @@ interface Stats {
   totalPlatformRevenue: number;
   activeSubscriptions: number;
   proSubscriptions: number;
+  eliteSubscriptions: number;
+  adminGrantedVips: number;
+  paidSubscriptions: number;
   totalFares: number;
 }
 
@@ -97,10 +100,37 @@ export default function AdminDashboard() {
           </div>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500 pt-3 border-t border-triq-light/10">
-          <span>Active Subs: <span className="text-white font-bold">{stats.activeSubscriptions}</span></span>
-          <span>Pro Tier: <span className="text-white font-bold">{stats.proSubscriptions}</span></span>
+          <span>Paid Subs: <span className="text-white font-bold">{stats.paidSubscriptions}</span></span>
+          <span>PRO: <span className="text-triq-cyan font-bold">{stats.proSubscriptions}</span></span>
+          <span>ELITE: <span className="text-triq-yellow font-bold">{stats.eliteSubscriptions}</span></span>
           <span>Completed Rides: <span className="text-white font-bold">{stats.completedRides}</span></span>
         </div>
+      </div>
+
+      {/* Admin-granted VIPs — separate from paid revenue */}
+      <div className="bg-gradient-to-br from-triq-slate to-triq-dark rounded-xl border border-triq-yellow/20 p-4 space-y-3 shadow-card">
+        <div className="flex items-center gap-2">
+          <Gift size={16} className="text-triq-yellow" />
+          <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Admin-Granted VIP</p>
+          <span className="ml-auto text-xs text-gray-500">Not counted in revenue</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-triq-dark/60 rounded-lg p-3 border border-triq-light/10 text-center">
+            <p className="text-2xl font-bold text-triq-yellow">{stats.adminGrantedVips}</p>
+            <p className="text-xs text-gray-400 mt-0.5">Active Grants</p>
+          </div>
+          <div className="bg-triq-dark/60 rounded-lg p-3 border border-triq-cyan/10 text-center">
+            <Crown size={14} className="text-triq-cyan mx-auto mb-1" />
+            <p className="text-xs text-gray-400">PRO grants</p>
+            <p className="text-sm font-bold text-triq-cyan">{stats.proSubscriptions}</p>
+          </div>
+          <div className="bg-triq-dark/60 rounded-lg p-3 border border-triq-yellow/10 text-center">
+            <Crown size={14} className="text-triq-yellow mx-auto mb-1" />
+            <p className="text-xs text-gray-400">ELITE grants</p>
+            <p className="text-sm font-bold text-triq-yellow">{stats.eliteSubscriptions}</p>
+          </div>
+        </div>
+        <p className="text-xs text-gray-600">Grant free VIP from Subscriptions → Grant Free VIP section</p>
       </div>
 
       {/* Stats grid */}

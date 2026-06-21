@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import { Phone, Car, Star, Shield, Bike, MapPin, Crown, Award, Zap, X, Heart } from 'lucide-react';
@@ -20,6 +20,7 @@ interface DriverData {
   pickupRadius: number;
   subscriptionTier: string;
   subscriptionStatus: string;
+  subscriptionExpiresAt: string | null;
 }
 
 interface KycData {
@@ -40,6 +41,67 @@ const DRIVER_DOC_TYPES = [
   { value: 'OR_CR', label: 'OR / CR' },
   { value: 'GOVT_ID', label: 'Government ID' },
 ];
+
+function VipCountdown({ expiresAt, tier }: { expiresAt: string | null; tier: string }) {
+  const calcRemaining = () => {
+    if (!expiresAt) return null;
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    if (diff <= 0) return null;
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    return { days, hours, mins, secs, diff };
+  };
+
+  const [remaining, setRemaining] = useState(calcRemaining);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => setRemaining(calcRemaining()), 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [expiresAt]);
+
+  if (!remaining) {
+    return <p className="text-xs text-red-400 font-medium">⚠️ Subscription expired</p>;
+  }
+
+  const isElite = tier === 'ELITE';
+  const colour = isElite ? 'text-triq-yellow' : 'text-triq-cyan';
+  const bgColour = isElite ? 'bg-triq-yellow/10 border-triq-yellow/20' : 'bg-triq-cyan/10 border-triq-cyan/20';
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${bgColour}`}>
+      <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Expires in</p>
+      <div className="flex items-end gap-2">
+        <div className="text-center">
+          <p className={`text-xl font-bold leading-none ${colour}`}>{remaining.days}</p>
+          <p className="text-[9px] text-gray-500 mt-0.5">day{remaining.days !== 1 ? 's' : ''}</p>
+        </div>
+        <p className={`text-lg font-bold leading-none ${colour} mb-0.5`}>:</p>
+        <div className="text-center">
+          <p className={`text-xl font-bold leading-none ${colour}`}>{pad(remaining.hours)}</p>
+          <p className="text-[9px] text-gray-500 mt-0.5">hrs</p>
+        </div>
+        <p className={`text-lg font-bold leading-none ${colour} mb-0.5`}>:</p>
+        <div className="text-center">
+          <p className={`text-xl font-bold leading-none ${colour}`}>{pad(remaining.mins)}</p>
+          <p className="text-[9px] text-gray-500 mt-0.5">min</p>
+        </div>
+        <p className={`text-lg font-bold leading-none ${colour} mb-0.5`}>:</p>
+        <div className="text-center">
+          <p className={`text-xl font-bold leading-none ${colour}`}>{pad(remaining.secs)}</p>
+          <p className="text-[9px] text-gray-500 mt-0.5">sec</p>
+        </div>
+      </div>
+      {remaining.days <= 3 && (
+        <p className="text-[10px] text-orange-400 mt-1 font-medium">⚠️ Expiring soon — renew to keep your perks</p>
+      )}
+    </div>
+  );
+}
 
 export default function DriverProfile() {
   const { user } = useAuthStore();
@@ -160,12 +222,15 @@ export default function DriverProfile() {
           <h3 className="text-sm font-semibold text-white">Subscription</h3>
         </div>
         {driver?.subscriptionTier === 'ELITE' ? (
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-triq-yellow font-bold text-sm">ELITE Active</p>
-              <p className="text-xs text-gray-400">All Pro perks + guaranteed top-3 placement · ₱{elitePrice}/month</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-triq-yellow font-bold text-sm">ELITE Active</p>
+                <p className="text-xs text-gray-400">All Pro perks + guaranteed top-3 placement · ₱{elitePrice}/month</p>
+              </div>
+              <span className="px-2 py-1 rounded-lg bg-triq-yellow/20 text-triq-yellow text-xs font-bold">ELITE</span>
             </div>
-            <span className="px-2 py-1 rounded-lg bg-triq-yellow/20 text-triq-yellow text-xs font-bold">ELITE</span>
+            <VipCountdown expiresAt={driver.subscriptionExpiresAt} tier="ELITE" />
           </div>
         ) : driver?.subscriptionTier === 'PRO' ? (
           <div className="space-y-3">
@@ -176,6 +241,7 @@ export default function DriverProfile() {
               </div>
               <span className="px-2 py-1 rounded-lg bg-triq-yellow/20 text-triq-yellow text-xs font-bold">PRO</span>
             </div>
+            <VipCountdown expiresAt={driver.subscriptionExpiresAt} tier="PRO" />
             <button
               onClick={() => upgradeToPro('ELITE')}
               disabled={subscribing}

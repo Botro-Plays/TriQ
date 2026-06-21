@@ -25,9 +25,9 @@ router.get('/stats/overview', async (_req, res) => {
     todayStart.setHours(0, 0, 0, 0);
     const todayRides = await prisma.ride.count({ where: { createdAt: { gte: todayStart } } });
 
-    const [subscriptionAgg, tipAgg, activeSubs, proSubs, faresAgg] = await Promise.all([
+    const [subscriptionAgg, tipAgg, activeSubs, proSubs, eliteSubs, adminGrantedVips, faresAgg] = await Promise.all([
       prisma.subscription.aggregate({
-        where: { status: 'ACTIVE' },
+        where: { status: 'ACTIVE', amount: { gt: 0 } },
         _sum: { amount: true },
       }),
       prisma.tip.aggregate({
@@ -36,13 +36,15 @@ router.get('/stats/overview', async (_req, res) => {
       }),
       prisma.subscription.count({ where: { status: 'ACTIVE' } }),
       prisma.subscription.count({ where: { status: 'ACTIVE', tier: 'PRO' } }),
+      prisma.subscription.count({ where: { status: 'ACTIVE', tier: 'ELITE' as any } }),
+      prisma.subscription.count({ where: { status: 'ACTIVE', amount: 0 } }),
       prisma.ride.aggregate({
         where: { status: 'COMPLETED', finalFare: { not: null } },
         _sum: { finalFare: true },
       }),
     ]);
 
-    const subscriptionRevenue = subscriptionAgg._sum.amount || 0;
+    const paidSubscriptionRevenue = subscriptionAgg._sum.amount || 0;
     const tipRevenue = tipAgg._sum.amount || 0;
 
     res.json({
@@ -55,11 +57,14 @@ router.get('/stats/overview', async (_req, res) => {
       completedRides,
       pendingKyc,
       suspendedDrivers,
-      subscriptionRevenue,
+      subscriptionRevenue: paidSubscriptionRevenue,
       tipRevenue,
-      totalPlatformRevenue: subscriptionRevenue + tipRevenue,
+      totalPlatformRevenue: paidSubscriptionRevenue + tipRevenue,
       activeSubscriptions: activeSubs,
       proSubscriptions: proSubs,
+      eliteSubscriptions: eliteSubs,
+      adminGrantedVips,
+      paidSubscriptions: activeSubs - adminGrantedVips,
       totalFares: faresAgg._sum.finalFare || 0,
     });
   } catch (err: any) {
