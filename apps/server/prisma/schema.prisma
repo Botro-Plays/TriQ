@@ -217,6 +217,8 @@ model Ride {
 
   paymentMethod   PaymentMethod @default(CASH)
 
+  preferredDriverId String? // rebook: only this driver can see/accept (subscription perk)
+
   passenger       Passenger @relation("PassengerRides", fields: [passengerId], references: [id])
   driver          Driver?   @relation("DriverRides", fields: [driverId], references: [id])
   statusHistory   RideStatus[]

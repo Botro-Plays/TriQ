@@ -90,12 +90,14 @@ export default function PassengerHome() {
   }, [user]);
 
   // Handle re-book navigation from History page
+  const [rebookDriverId, setRebookDriverId] = useState<string | null>(null);
   useEffect(() => {
-    const state = location.state as { pickup?: { lat: number; lng: number; address: string }; dropoff?: { lat: number; lng: number; address: string } } | null;
+    const state = location.state as { pickup?: { lat: number; lng: number; address: string }; dropoff?: { lat: number; lng: number; address: string }; preferredDriverId?: string | null } | null;
     if (state?.pickup && state?.dropoff) {
       setPickup(state.pickup);
       setDropoff(state.dropoff);
       setDropoffQuery(state.dropoff.address);
+      setRebookDriverId(state.preferredDriverId || null);
       setStep('searching');
     }
   }, [location.state]);
@@ -249,6 +251,7 @@ export default function PassengerHome() {
         studentCount,
         hasExtraBaggage,
         driverTip,
+        preferredDriverId: rebookDriverId,
       });
       setStep('searching');
     } catch (err: any) {
@@ -318,8 +321,12 @@ export default function PassengerHome() {
       ) : step === 'searching' ? (
         <div className="card p-6 text-center">
           <div className="inline-block w-8 h-8 border-2 border-triq-cyan/30 border-t-triq-cyan rounded-full animate-spin mb-3" />
-          <p className="text-white font-semibold">Searching for drivers...</p>
-          <p className="text-gray-400 text-sm mt-1">Waiting for a driver to accept</p>
+          <p className="text-white font-semibold">
+            {rebookDriverId ? 'Sending to your driver...' : 'Searching for drivers...'}
+          </p>
+          <p className="text-gray-400 text-sm mt-1">
+            {rebookDriverId ? 'Rebook request sent to your previous driver' : 'Waiting for a driver to accept'}
+          </p>
           <button onClick={() => cancelRide()} className="mt-4 text-sm text-red-400 hover:text-red-300">
             Cancel request
           </button>

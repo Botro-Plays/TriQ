@@ -89,11 +89,28 @@ router.post('/', async (req, res) => {
       studentCount = hasStudent ? 1 : 0,
       driverTip = 0,
       paymentMethod = 'CASH',
+      preferredDriverId = null,
     } = req.body;
 
     if (!passengerId || typeof pickupLat !== 'number' || typeof dropoffLat !== 'number') {
       res.status(400).json({ error: 'passengerId, pickupLat/Lng, dropoffLat/Lng are required' });
       return;
+    }
+
+    // If rebook with preferredDriverId, verify driver has active subscription
+    if (preferredDriverId) {
+      const driver = await prisma.driver.findUnique({
+        where: { id: preferredDriverId },
+        select: { id: true, subscriptionStatus: true, status: true },
+      });
+      if (!driver) {
+        res.status(404).json({ error: 'Preferred driver not found' });
+        return;
+      }
+      if (driver.subscriptionStatus !== 'ACTIVE') {
+        res.status(403).json({ error: 'Driver does not have an active subscription. Rebook is a Pro-only feature.' });
+        return;
+      }
     }
 
     // Check for existing active ride
@@ -131,6 +148,7 @@ router.post('/', async (req, res) => {
         hasExtraBaggage,
         paymentMethod,
         estimatedFare,
+        preferredDriverId,
       },
       include: {
         passenger: { select: { name: true, photoUrl: true } },
@@ -154,6 +172,7 @@ router.get('/pending', async (req, res) => {
     const lat = parseFloat(req.query.lat as string);
     const lng = parseFloat(req.query.lng as string);
     const radiusKm = parseFloat(req.query.radius as string) || 5;
+    const driverId = req.query.driverId as string;
 
     if (isNaN(lat) || isNaN(lng)) {
       res.status(400).json({ error: 'lat and lng are required' });
@@ -174,8 +193,17 @@ router.get('/pending', async (req, res) => {
       }));
     }
 
+    // Build where clause: show rebook rides only to the preferred driver
+    const where: any = { status: 'REQUESTED' };
+    if (driverId) {
+      where.OR = [
+        { preferredDriverId: null },
+        { preferredDriverId: driverId },
+      ];
+    }
+
     const rides: Array<{ id: string; pickupLat: number; pickupLng: number; [key: string]: any }> = await prisma.ride.findMany({
-      where: { status: 'REQUESTED' },
+      where,
       orderBy: { createdAt: 'asc' },
       take: 20,
       include: {
@@ -322,6 +350,12 @@ router.post('/:id/accept', async (req, res) => {
     }
     if (ride.status !== 'REQUESTED') {
       res.status(409).json({ error: 'Ride is no longer available' });
+      return;
+    }
+
+    // Rebook rides can only be accepted by the preferred driver
+    if (ride.preferredDriverId && ride.preferredDriverId !== driverId) {
+      res.status(403).json({ error: 'This ride is a rebook request for a specific driver' });
       return;
     }
 

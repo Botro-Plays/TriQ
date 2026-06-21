@@ -75,19 +75,19 @@
 - [ ] **Points deduction**: Fake ride = -50 passenger points; leaderboard disqualification for repeated offenses
 
 #### Safety & Reporting
-- [ ] **Emergency button** during active ride (3-second hold to prevent accidental press) — primary: silent alert to admin (email/SMS); fallback: call configured emergency contact; option: call barangay tanod
-- [ ] **Share ride details** — send live ride link to trusted contact
+- [x] **Emergency button** during active ride (3-second hold to prevent accidental press) — primary: silent alert to admin (email/SMS); fallback: call configured emergency contact; option: call barangay tanod
+- [x] **Share ride details** — send live ride link to trusted contact
 - [ ] **Report history** — view status of submitted reports (pending / resolved / dismissed)
 
 #### Ride History
-- [ ] List of past rides with date, route, fare
-- [ ] Tap to view details
-- [ ] Re-book same route button
+- [x] List of past rides with date, route, fare
+- [x] Tap to view details
+- [x] **Re-book same route** — subscription perk: only available if the original driver has an active Pro subscription. Rebook creates a ride request visible only to that specific driver.
 
 #### Gamification (Passenger View)
 - [ ] **Driver Badges visible on ride request** — see driver achievements before accepting
 - [ ] **Driver rank shown** in driver info card during active ride
-- [ ] **"Rate & Help them earn badges"** prompt after ride completion
+- [x] **"Rate & Help them earn badges"** prompt after ride completion
 
 #### Passenger Gamification & Leaderboard
 - [ ] **Passenger Points System**: earn points for every completed ride, 5-star rating given, consecutive booking days, positive thumbs up received from drivers
@@ -100,10 +100,10 @@
   - [ ] "Loyal Rider" — 30 consecutive days with at least 1 ride
   - [ ] "KYC Verified" — verified passenger badge
   - [ ] "Top Supporter" — top 10% platform tippers in the city
-- [ ] **Passenger Leaderboard tabs**: This Week / This Month / All Time
-  - [ ] Top by rides completed
-  - [ ] Top by platform tips given
-  - [ ] Top by positive ratings received from drivers
+- [x] **Passenger Leaderboard tabs**: This Week / This Month / All Time
+  - [x] Top by rides completed
+  - [x] Top by platform tips given
+  - [x] Top by average rating given
   - [ ] Top by consecutive booking days
 - [ ] **Passenger profile card** shows badge collection + points total + city rank
 - [ ] **Rank display**: "#5 Rider in Digos City this week"
@@ -207,8 +207,8 @@
 - [ ] "VIP Passenger" indicator for top-ranked passengers (optional priority acceptance)
 
 #### Safety & Reporting
-- [ ] **Emergency button** during active ride
-- [ ] **Share ride details** — live ride link to family/contact
+- [x] **Emergency button** during active ride
+- [x] **Share ride details** — live ride link to family/contact
 - [ ] **Report history** — view status of submitted reports
 
 #### Subscription
@@ -227,10 +227,10 @@
   - [ ] "Rising Star" — reached top 10% on any leaderboard
   - [ ] "Franchise Holder" — verified KYC badge (always visible)
   - [ ] "TriQ Pro" / "TriQ Elite" — subscription tier badges
-- [ ] **Leaderboard tabs**: This Week / This Month / All Time
-  - [ ] Top by rides completed
-  - [ ] Top by earnings
-  - [ ] Top by average rating
+- [x] **Leaderboard tabs**: This Week / This Month / All Time
+  - [x] Top by rides completed
+  - [x] Top by earnings (finalFare sum)
+  - [x] Top by average rating
   - [ ] Top by consecutive days online
 - [ ] **Driver profile card** shows badge collection + points total
 - [ ] **Rank display**: "#3 in Digos City this week"
@@ -299,8 +299,8 @@ Full-featured browser alternative to the mobile passenger app. Works on desktop,
 - [ ] **Report Driver** — categories with optional photo/video
 
 #### Safety & Reporting
-- [ ] **Emergency button** during active ride (3-second hold to prevent accidental press) — primary: silent alert to admin (email/SMS); fallback: call configured emergency contact; option: call barangay tanod
-- [ ] **Share ride details** — live ride link to trusted contact
+- [x] **Emergency button** during active ride (3-second hold to prevent accidental press) — primary: silent alert to admin (email/SMS); fallback: call configured emergency contact; option: call barangay tanod
+- [x] **Share ride details** — live ride link to trusted contact
 - [ ] **Report history** — track submitted report status
 
 #### Fake Ride Protection
@@ -308,8 +308,8 @@ Full-featured browser alternative to the mobile passenger app. Works on desktop,
 - [ ] Browser-based strike warning banners
 
 #### Ride History
-- [ ] List of past rides
-- [ ] View details, re-book same route
+- [x] List of past rides
+- [x] View details, re-book same route (subscription perk — only if driver has active Pro subscription)
 
 #### Gamification (Passenger View)
 - [ ] **Driver Badges visible** when selecting a driver on map
@@ -317,8 +317,8 @@ Full-featured browser alternative to the mobile passenger app. Works on desktop,
 - [ ] **"Help your driver earn badges!"** CTA after rating
 
 #### Passenger Gamification & Leaderboard
-- [ ] Same points, badges, and leaderboards as mobile passenger app
-- [ ] Browser-based leaderboard viewer (responsive table)
+- [ ] Same points, badges as mobile passenger app
+- [x] Browser-based leaderboard viewer (responsive, This Week / This Month / All Time tabs)
 - [ ] Share rank/badge to social media (optional)
 
 #### Settings
@@ -373,11 +373,13 @@ Public-facing marketing site served at root domain.
 ### 5. Admin Web Dashboard (React + Vite)
 
 #### Overview Dashboard
-- [ ] Total rides today / this week / this month
-- [ ] Active drivers online now
-- [ ] Active rides in progress
-- [ ] Revenue from subscriptions (₱)
-- [ ] Revenue from platform tips (₱)
+- [x] Total rides today
+- [x] Active drivers online now
+- [x] Active rides in progress
+- [x] Revenue from subscriptions (₱)
+- [x] Revenue from platform tips (₱)
+- [x] Total fares from completed rides (₱)
+- [x] Subscription tier breakdown (active / Pro counts)
 - [ ] Map view of all active rides and online drivers
 
 #### KYC & Document Review
@@ -412,7 +414,7 @@ Public-facing marketing site served at root domain.
 - [ ] **Audit disclaimer**: All earnings figures are estimated based on platform-calculated fares; actual cash collection may differ
 
 #### Passenger Management
-- [ ] List passengers with KYC status filter (unverified, pending, verified, rejected)
+- [x] List passengers with search, KYC status, trust score, ride/strike counts
 - [ ] **Passenger detail view**: Full profile, phone, emergency contact, KYC status, current strike count, points total, badges earned
 - [ ] **Edit passenger profile**: Update name, phone, emergency contact (with audit log)
 - [ ] **Reset passenger password**: Force Firebase password/OTP reset
@@ -421,7 +423,7 @@ Public-facing marketing site served at root domain.
 - [ ] View passenger KYC documents
 - [ ] View passenger saved places (Home, Work, etc.)
 - [ ] View passenger notification preferences
-- [ ] Suspend / ban / reactivate passengers
+- [x] Suspend / reinstate passengers (trust score → 0)
 - [ ] **Passenger impersonation**: Login as passenger for support (full audit log of all actions taken)
 
 #### Ride Monitoring
@@ -435,22 +437,22 @@ Public-facing marketing site served at root domain.
 - [ ] **Emergency response log**: All emergency button presses with timestamp, ride link, location, alert type (admin/SMS/call), resolution status
 
 #### Ratings & Reviews Management
-- [ ] **All ratings list**: View every passenger→driver rating (1-5 stars, comment, thumbs up/down)
-- [ ] **Filter ratings**: By passenger, by driver, by date range, by rating (1-5), by thumbs direction
+- [x] **All ratings list**: View every passenger→driver rating (1-5 stars, comment, thumbs up/down)
+- [x] **Filter ratings**: By rating level (low 1-2★, mid 1-3★, all)
 - [ ] **Moderate ratings**: Hide/soft-delete abusive or fake ratings (with reason, visible to admin only)
-- [ ] **Rating analytics**: Average rating per driver, rating distribution histogram, rating trends over time
+- [x] **Rating analytics**: Platform-wide average rating displayed
 - [ ] **Thumbs up/down analytics**: Overall thumbs ratio per driver, per passenger, platform-wide trends
 - [ ] **Driver-submitted passenger feedback**: View all driver thumbs up/down on passengers (used for matching quality)
 
 #### Driver Gamification & Engagement
-- [ ] **Driver Leaderboard viewer** (rides, earnings, rating, consecutive days — weekly/monthly/all-time)
+- [x] **Driver Leaderboard viewer** (rides, earnings, rating — weekly/monthly/all-time)
 - [ ] Driver badge/achievement management (enable/disable, create seasonal)
 - [ ] Driver points configuration (points per ride, per star, per day online, etc.)
 - [ ] Driver gamification analytics (engagement rate, leaderboard participation)
 - [ ] Driver seasonal challenges setup
 
 #### Passenger Gamification & Engagement
-- [ ] **Passenger Leaderboard viewer** (rides completed, platform tips given, positive ratings received, consecutive days — weekly/monthly/all-time)
+- [x] **Passenger Leaderboard viewer** (rides completed, platform tips given, average rating — weekly/monthly/all-time)
 - [ ] Passenger badge/achievement management (enable/disable, create new badges)
 - [ ] Passenger points configuration
 - [ ] Passenger gamification analytics
@@ -471,22 +473,25 @@ Public-facing marketing site served at root domain.
 
 #### Strike Management (Fake Ride Protection)
 > TriQ does **not hold money in escrow**. Strikes are the primary deterrent against fake rides.
-- [ ] **Passenger strike queue**: List all passengers with active strikes, ordered by severity
+- [x] **Passenger strike queue**: List all passengers with active strikes
 - [ ] **Driver strike queue**: List all drivers with active strikes, ordered by severity
 - [ ] **Strike detail view**: Which ride triggered it, GPS data, cancellation timing, both party statements
-- [ ] **Override strikes**: Admin can clear, reduce, or add strikes with mandatory reason
+- [x] **Override strikes**: Admin can revoke strikes
 - [ ] **Appeals workflow**: Users can submit appeal → admin reviews → decision with note
 - [ ] **Strike analytics**: Fake ride rates by user segment, city-wide fake ride trend, strike effectiveness
 - [ ] **Auto-escalation rules**: Configure thresholds (e.g., 3 auto-cancels in 1 day = auto-strike)
 - [ ] **Strike notification templates**: Customize warning/ban messages per strike level
 
 #### Payments & Subscriptions
-- [ ] Subscription revenue report
+- [x] Subscription revenue report (active subscription revenue aggregate)
+- [x] **Subscription list**: All subscriptions with tier, status, driver info, amount, dates, trial flag
 - [ ] **Subscription detail per driver**: Tier history, payment history, expiry dates, grace period status
-- [ ] Platform tip transaction log
+- [x] Platform tip transaction log (all tips with status filter, total paid tips)
 - [ ] **Tip analytics**: Tipping conversion rate, average tip amount, tips by time of day, tips by ride count
 
 #### App Configuration & Feature Flags
+- [x] **System config viewer**: View all key-value config entries
+- [x] **System config editor**: Edit config values inline
 - [ ] **Browse mode toggle**: Enable/disable non-KYC browse mode globally
 - [ ] **KYC requirement toggle**: Make KYC optional vs mandatory for booking (emergency override)
 - [ ] **Gamification master switch**: Enable/disable all leaderboards, badges, points globally

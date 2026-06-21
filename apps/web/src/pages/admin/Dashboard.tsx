@@ -16,6 +16,7 @@ interface Stats {
   totalPlatformRevenue: number;
   activeSubscriptions: number;
   proSubscriptions: number;
+  totalFares: number;
 }
 
 export default function AdminDashboard() {
@@ -55,6 +56,7 @@ export default function AdminDashboard() {
     { label: 'Active Rides', value: stats.activeRides, color: 'text-orange-400' },
     { label: 'Today\'s Rides', value: stats.todayRides, color: 'text-blue-400' },
     { label: 'Completed', value: stats.completedRides, color: 'text-green-400' },
+    { label: 'Total Fares', value: formatPeso(stats.totalFares), color: 'text-triq-yellow' },
     { label: 'Pending KYC', value: stats.pendingKyc, color: 'text-purple-400' },
     { label: 'Suspended', value: stats.suspendedDrivers, color: 'text-red-400' },
   ];

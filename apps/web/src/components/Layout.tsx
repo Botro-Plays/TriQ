@@ -3,7 +3,7 @@ import { useAuthStore } from '../stores/authStore';
 import {
   Home, Map, User, DollarSign, LayoutDashboard, ShieldCheck,
   Car, FlagTriangleRight, LogOut, Menu, X, History,
-  CreditCard, Heart, Users, Star, MoreHorizontal,
+  CreditCard, Heart, Users, Star, MoreHorizontal, Trophy,
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -21,11 +21,13 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Home', path: '/passenger', icon: Home },
     { label: 'Map', path: '/passenger/map', icon: Map },
     { label: 'History', path: '/passenger/history', icon: History },
+    { label: 'Ranks', path: '/passenger/leaderboard', icon: Trophy },
     { label: 'Profile', path: '/passenger/profile', icon: User },
   ],
   DRIVER: [
     { label: 'Home', path: '/driver', icon: Home },
     { label: 'Earnings', path: '/driver/earnings', icon: DollarSign },
+    { label: 'Ranks', path: '/driver/leaderboard', icon: Trophy },
     { label: 'Profile', path: '/driver/profile', icon: User },
   ],
   OWNER: [

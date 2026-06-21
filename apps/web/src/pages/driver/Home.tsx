@@ -39,6 +39,7 @@ interface PendingRide {
   hasStudent: boolean;
   hasExtraBaggage: boolean;
   passenger: { name: string; user?: { phoneNumber: string } };
+  preferredDriverId?: string | null;
 }
 
 interface ActiveRide {
@@ -224,7 +225,7 @@ export default function DriverHome() {
         const loc = locationRef.current;
         if (!loc) return;
         const { data } = await api.get('/rides/pending', {
-          params: { lat: loc.lat, lng: loc.lng, radius: 2.5 },
+          params: { lat: loc.lat, lng: loc.lng, radius: 2.5, driverId },
         });
         setPendingRides(data.rides || []);
       } catch {
@@ -234,7 +235,7 @@ export default function DriverHome() {
     fetchPending();
     const interval = setInterval(fetchPending, 8000);
     return () => clearInterval(interval);
-  }, [isOnline, location != null, activeRide]);
+  }, [isOnline, location != null, activeRide, driverId]);
 
   const acceptRide = async (rideId: string) => {
     if (!driverId) return;
@@ -596,6 +597,9 @@ function RideRequestCard({
             <Navigation size={10} className="text-triq-cyan" />
             {pickupDistance.toFixed(1)}km
           </span>
+          {ride.preferredDriverId && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-triq-cyan/20 text-triq-cyan font-medium">REBOOK</span>
+          )}
         </div>
         <span className="text-xs text-gray-400">{ride.passengerCount} passenger{ride.passengerCount > 1 ? 's' : ''}</span>
       </div>

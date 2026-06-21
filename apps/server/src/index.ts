@@ -38,6 +38,7 @@ import rideRoutes from './routes/ride';
 import tipRoutes from './routes/tip';
 import adminRoutes from './routes/admin';
 import reportRoutes from './routes/report';
+import leaderboardRoutes from './routes/leaderboard';
 
 const app = express();
 const httpServer = createServer(app);
@@ -80,6 +81,7 @@ app.use('/api/v1/rides', rideRoutes);
 app.use('/api/v1/tips', tipRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/leaderboards', leaderboardRoutes);
 
 // Socket.io
 setupSocketHandlers(io, prisma);

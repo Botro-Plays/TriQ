@@ -25,7 +25,7 @@ router.get('/stats/overview', async (_req, res) => {
     todayStart.setHours(0, 0, 0, 0);
     const todayRides = await prisma.ride.count({ where: { createdAt: { gte: todayStart } } });
 
-    const [subscriptionAgg, tipAgg, activeSubs, proSubs] = await Promise.all([
+    const [subscriptionAgg, tipAgg, activeSubs, proSubs, faresAgg] = await Promise.all([
       prisma.subscription.aggregate({
         where: { status: 'ACTIVE' },
         _sum: { amount: true },
@@ -36,6 +36,10 @@ router.get('/stats/overview', async (_req, res) => {
       }),
       prisma.subscription.count({ where: { status: 'ACTIVE' } }),
       prisma.subscription.count({ where: { status: 'ACTIVE', tier: 'PRO' } }),
+      prisma.ride.aggregate({
+        where: { status: 'COMPLETED', finalFare: { not: null } },
+        _sum: { finalFare: true },
+      }),
     ]);
 
     const subscriptionRevenue = subscriptionAgg._sum.amount || 0;
@@ -56,6 +60,7 @@ router.get('/stats/overview', async (_req, res) => {
       totalPlatformRevenue: subscriptionRevenue + tipRevenue,
       activeSubscriptions: activeSubs,
       proSubscriptions: proSubs,
+      totalFares: faresAgg._sum.finalFare || 0,
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get stats', message: err.message });

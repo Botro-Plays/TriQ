@@ -14,6 +14,9 @@ import DriverHome from './pages/driver/Home';
 import DriverEarnings from './pages/driver/Earnings';
 import DriverProfile from './pages/driver/Profile';
 
+// Shared pages
+import Leaderboard from './pages/shared/Leaderboard';
+
 // Admin pages
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminKycQueue from './pages/admin/KycQueue';
@@ -71,6 +74,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/passenger/leaderboard"
+            element={
+              <ProtectedRoute allowedRoles={['PASSENGER']}>
+                <Leaderboard role="passengers" />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Driver routes */}
           <Route
@@ -94,6 +105,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['DRIVER']}>
                 <DriverProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/driver/leaderboard"
+            element={
+              <ProtectedRoute allowedRoles={['DRIVER']}>
+                <Leaderboard role="drivers" />
               </ProtectedRoute>
             }
           />

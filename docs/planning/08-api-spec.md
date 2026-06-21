@@ -198,9 +198,31 @@ Response:
 
 Query params:
 - `period` (string): `week` | `month` | `alltime`
-- `metric` (string): `rides` | `earnings` | `rating` | `tips` (passenger) / `consecutive_days` (driver)
+- `metric` (string): `rides` | `earnings` | `rating` (driver) / `rides` | `tips` | `ratings` (passenger)
 - `page` (int, default=1)
 - `limit` (int, default=20, max=100)
+
+Response:
+```json
+{
+  "entries": [
+    {
+      "id": "uuid",
+      "name": "Juan Dela Cruz",
+      "photoUrl": "...",
+      "rank": 1,
+      "score": 42,
+      "plateNumber": "ABC-123",
+      "rating": 4.8,
+      "totalRides": 150,
+      "subscriptionTier": "PRO"
+    }
+  ],
+  "total": 25,
+  "page": 1,
+  "pages": 2
+}
+```
 
 ### Gamification
 | Method | Endpoint | Auth | Description |

@@ -41,15 +41,18 @@ Drivers are the paying customers. Subscriptions are **monthly** and grant algori
 - Access to earnings analytics dashboard
 - Priority support chat
 - **Exclusive Pro-only leaderboard badge flair** (gold border on rank)
+- **Rebook perk**: Passengers can rebook a ride directly with this driver (ride request visible only to this driver)
 
-### Elite Driver — **"TriQ Elite"** (₱99/month)
-- Everything in Pro
-- **"Top Rated" or "Elite" badge**
-- Guaranteed top-3 placement in nearby searches
-- Exclusive "Elite Driver" filter passengers can toggle
-- Priority matching + guaranteed top-3 placement in all conditions
-- Monthly performance report + tips for maximizing earnings
-- **Elite-only seasonal challenge eligibility** (bigger prizes, free Elite for 1 month)
+> **Note**: Elite tier has been removed from the schema. Only FREE and PRO tiers are supported.
+
+### ~~Elite Driver — "TriQ Elite" (₱99/month)~~ — REMOVED
+- ~~Everything in Pro~~
+- ~~"Top Rated" or "Elite" badge~~
+- ~~Guaranteed top-3 placement in nearby searches~~
+- ~~Exclusive "Elite Driver" filter passengers can toggle~~
+- ~~Priority matching + guaranteed top-3 placement in all conditions~~
+- ~~Monthly performance report + tips for maximizing earnings~~
+- ~~Elite-only seasonal challenge eligibility~~ (bigger prizes, free Elite for 1 month)
 
 ### Subscription Lifecycle
 ```
