@@ -763,6 +763,7 @@ router.get('/paymongo', async (_req, res) => {
       webhookSecret: map.PAYMONGO_WEBHOOK_SECRET ? '****' : '',
       webhookUrl: `https://${process.env.WEB_APP_URL ? new URL(process.env.WEB_APP_URL).host : 'triq.dpdns.org'}/api/v1/tips/webhook`,
       isConfigured: !!(map.PAYMONGO_SECRET_KEY && map.PAYMONGO_PUBLIC_KEY),
+      proSubscriptionPrice: map.PAYMONGO_PRO_PRICE ? parseInt(map.PAYMONGO_PRO_PRICE, 10) : 5000,
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get PayMongo config', message: err.message });
@@ -772,12 +773,16 @@ router.get('/paymongo', async (_req, res) => {
 // PUT /api/v1/admin/paymongo — save PayMongo config
 router.put('/paymongo', async (req, res) => {
   try {
-    const { secretKey, publicKey, webhookSecret } = req.body;
+    const { secretKey, publicKey, webhookSecret, proSubscriptionPrice } = req.body;
     const updates: { key: string; value: string; description: string }[] = [];
 
     if (secretKey) updates.push({ key: 'PAYMONGO_SECRET_KEY', value: secretKey, description: 'PayMongo Secret API Key' });
     if (publicKey) updates.push({ key: 'PAYMONGO_PUBLIC_KEY', value: publicKey, description: 'PayMongo Public API Key' });
     if (webhookSecret) updates.push({ key: 'PAYMONGO_WEBHOOK_SECRET', value: webhookSecret, description: 'PayMongo Webhook Signing Secret' });
+    if (proSubscriptionPrice !== undefined) {
+      const priceCentavos = Math.max(10000, Math.round(parseFloat(proSubscriptionPrice) * 100));
+      updates.push({ key: 'PAYMONGO_PRO_PRICE', value: String(priceCentavos), description: 'TriQ Pro subscription price in centavos' });
+    }
 
     for (const u of updates) {
       await prisma.systemConfig.upsert({

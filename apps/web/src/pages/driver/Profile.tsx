@@ -59,6 +59,13 @@ export default function DriverProfile() {
 
   // Subscription state
   const [subscribing, setSubscribing] = useState(false);
+  const [proPrice, setProPrice] = useState<number>(50); // PHP, fetched from server
+
+  useEffect(() => {
+    api.get('/subscriptions/price')
+      .then((res) => setProPrice(res.data.php))
+      .catch(() => {});
+  }, []);
 
   const fetchAll = () => {
     if (!user) return;
@@ -152,19 +159,19 @@ export default function DriverProfile() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-triq-yellow font-bold text-sm">PRO Active</p>
-              <p className="text-xs text-gray-400">Rebook perk enabled · ₱50/month</p>
+              <p className="text-xs text-gray-400">Rebook perk enabled · ₱{proPrice}/month</p>
             </div>
             <span className="px-2 py-1 rounded-lg bg-triq-yellow/20 text-triq-yellow text-xs font-bold">PRO</span>
           </div>
         ) : (
           <>
-            <p className="text-xs text-gray-400">Upgrade to PRO for ₱50/month to enable the rebook perk — passengers can request you specifically.</p>
+            <p className="text-xs text-gray-400">Upgrade to PRO for ₱{proPrice}/month to enable the rebook perk — passengers can request you specifically.</p>
             <button
               onClick={upgradeToPro}
               disabled={subscribing}
               className="w-full h-10 rounded-lg bg-triq-yellow text-triq-dark font-bold text-sm disabled:opacity-40"
             >
-              {subscribing ? 'Processing...' : 'Upgrade to PRO — ₱50/month'}
+              {subscribing ? 'Processing...' : `Upgrade to PRO — ₱${proPrice}/month`}
             </button>
           </>
         )}

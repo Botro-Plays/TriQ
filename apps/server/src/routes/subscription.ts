@@ -4,8 +4,6 @@ import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-const PRO_PRICE_CENTAVOS = 5000; // ₱50/month
-
 // POST /api/v1/subscriptions/checkout — initiate PayMongo checkout for PRO subscription
 router.post('/checkout', async (req: AuthRequest, res) => {
   try {
@@ -20,6 +18,10 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       res.status(404).json({ error: 'Driver not found' });
       return;
     }
+
+    // Read price from SystemConfig (set by admin), default ₱50
+    const priceConfig = await prisma.systemConfig.findUnique({ where: { key: 'PAYMONGO_PRO_PRICE' } });
+    const PRO_PRICE_CENTAVOS = priceConfig?.value ? parseInt(priceConfig.value, 10) : 5000;
 
     // Check SystemConfig first, then fall back to env var
     const paymongoConfig = await prisma.systemConfig.findUnique({ where: { key: 'PAYMONGO_SECRET_KEY' } });
@@ -116,6 +118,17 @@ router.post('/checkout', async (req: AuthRequest, res) => {
     res.status(201).json({ subscription: sub, checkoutUrl });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to create subscription checkout', message: err.message });
+  }
+});
+
+// GET /api/v1/subscriptions/price — return current PRO subscription price
+router.get('/price', async (_req, res) => {
+  try {
+    const priceConfig = await prisma.systemConfig.findUnique({ where: { key: 'PAYMONGO_PRO_PRICE' } });
+    const centavos = priceConfig?.value ? parseInt(priceConfig.value, 10) : 5000;
+    res.json({ centavos, php: centavos / 100 });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get price', message: err.message });
   }
 });
 
