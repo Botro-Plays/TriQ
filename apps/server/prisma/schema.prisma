@@ -274,6 +274,8 @@ model Review {
   rating      Int      // 1–5
   comment     String?
   thumbsUp    Boolean?
+  isHidden    Boolean  @default(false) // admin moderation: hidden from public
+  hiddenReason String?
   createdAt   DateTime @default(now())
 
   ride        Ride     @relation(fields: [rideId], references: [id])

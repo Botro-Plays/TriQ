@@ -282,4 +282,74 @@ router.get('/:id/earnings', async (req, res) => {
   }
 });
 
+// GET /api/v1/drivers/:id/badges — earned badges
+router.get('/:id/badges', async (req, res) => {
+  try {
+    const badges = await prisma.driverBadge.findMany({
+      where: { driverId: req.params.id },
+      include: { badge: true },
+      orderBy: { awardedAt: 'desc' },
+    });
+    res.json({ badges });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get badges', message: err.message });
+  }
+});
+
+// GET /api/v1/drivers/:id/points — points history
+router.get('/:id/points', async (req, res) => {
+  try {
+    const points = await prisma.driverPoints.findMany({
+      where: { driverId: req.params.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    const total = points.reduce((sum, p) => sum + p.points, 0);
+    res.json({ points, total });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get points', message: err.message });
+  }
+});
+
+// POST /api/v1/drivers/:id/report-passenger — driver reports a passenger
+router.post('/:id/report-passenger', async (req, res) => {
+  try {
+    const { rideId, category, description } = req.body;
+    if (!rideId || !category) {
+      res.status(400).json({ error: 'rideId and category are required' });
+      return;
+    }
+
+    const ride = await prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride) {
+      res.status(404).json({ error: 'Ride not found' });
+      return;
+    }
+    if (ride.driverId !== req.params.id) {
+      res.status(403).json({ error: 'You can only report passengers from your own rides' });
+      return;
+    }
+
+    const severity = ['Harassment'].includes(category) ? 'HIGH'
+      : ['No-show', 'Refused to pay', 'Abusive behavior'].includes(category) ? 'MEDIUM'
+      : 'LOW';
+
+    const report = await prisma.report.create({
+      data: {
+        rideId,
+        reporterId: req.params.id,
+        reportedId: ride.passengerId,
+        reporterRole: 'DRIVER',
+        reportedRole: 'PASSENGER',
+        category,
+        severity,
+        description: description || null,
+      },
+    });
+
+    res.status(201).json(report);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to create report', message: err.message });
+  }
+});
+
 export default router;

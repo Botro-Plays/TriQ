@@ -19,7 +19,7 @@
 | dotenv loading | ✅ | `src/index.ts` | Fixed to use `__dirname` for PM2 compatibility |
 | Health check endpoint | ✅ | `src/index.ts` | `GET /health` returns `{status: 'ok'}` |
 | Graceful shutdown (SIGTERM/SIGINT) | ✅ | `src/index.ts` | Closes HTTP server + Prisma disconnect |
-| Socket.io scaffold | 🟡 | `src/socket/index.ts` | Connection handler exists, all ride events are TODO stubs |
+| Socket.io real-time | ✅ | `src/socket/index.ts` | JWT auth, room-based user/driver rooms, ride events, location broadcasting, counter-offer events, disconnect cleanup |
 | Prisma Client generation | ✅ | `prisma/schema.prisma` | Generated client packaged in CI/CD |
 
 ### 1.2 Authentication (`src/routes/auth.ts`)
@@ -38,9 +38,9 @@
 ### 1.3 User Routes (`src/routes/user.ts`)
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Get current user | ❌ | `GET /api/v1/users/me` — stub (501) |
-| Update profile | ❌ | `PATCH /api/v1/users/me` — stub (501) |
-| Deactivate account | ❌ | `DELETE /api/v1/users/me` — stub (501) |
+| Get current user | ✅ | `GET /api/v1/users/me` — returns user with passenger/driver profile |
+| Update profile | ✅ | `PATCH /api/v1/users/me` — update name, photoUrl, email |
+| Deactivate account | ✅ | `DELETE /api/v1/users/me` — soft-deactivates (sets driver offline, invalidates firebaseUid) |
 
 ### 1.4 Passenger Routes (`src/routes/passenger.ts`)
 | Feature | Status | Notes |
@@ -49,10 +49,10 @@
 | Get passenger profile | ✅ | `GET /api/v1/passengers/:id` — full profile with home/work locations, emergency contact |
 | Ride history | ✅ | `GET /api/v1/passengers/:id/rides` — paginated, includes driver info, review, pickup/dropoff coords, driver subscription status |
 | Save favorite place | ✅ | `POST /api/v1/passengers/:id/places` — saves home/work location |
-| Submit KYC documents | ❌ | `POST /api/v1/passengers/:id/kyc` — not yet implemented |
-| Earned badges | ❌ | `GET /api/v1/passengers/:id/badges` — not yet implemented |
-| Points history | ❌ | `GET /api/v1/passengers/:id/points` — not yet implemented |
-| Saved places | ❌ | `GET /api/v1/passengers/:id/places` — not yet implemented |
+| Submit KYC documents | ✅ | `POST /api/v1/passengers/:id/kyc` — creates Document record, sets kycStatus to PENDING_REVIEW |
+| Earned badges | ✅ | `GET /api/v1/passengers/:id/badges` — list with badge details |
+| Points history | ✅ | `GET /api/v1/passengers/:id/points` — list with total |
+| Saved places | ✅ | `GET /api/v1/passengers/:id/places` — list saved places |
 
 ### 1.5 Driver Routes (`src/routes/driver.ts`)
 | Feature | Status | Notes |
@@ -66,8 +66,9 @@
 | Ride history | ✅ | `GET /api/v1/drivers/:id/rides` — paginated with passenger info |
 | Earnings summary | ✅ | `GET /api/v1/drivers/:id/earnings` — today/week/month/all-time aggregates |
 | Find nearby drivers | ✅ | `GET /api/v1/drivers/nearby` — lat/lng/radius query with subscription tier sorting |
-| Earned badges | ❌ | `GET /api/v1/drivers/:id/badges` — not yet implemented |
-| Points history | ❌ | `GET /api/v1/drivers/:id/points` — not yet implemented |
+| Earned badges | ✅ | `GET /api/v1/drivers/:id/badges` — list with badge details |
+| Points history | ✅ | `GET /api/v1/drivers/:id/points` — list with total |
+| Report passenger | ✅ | `POST /api/v1/drivers/:id/report-passenger` — driver reports passenger from their ride |
 
 ### 1.6 Ride Routes (`src/routes/ride.ts`)
 | Feature | Status | Notes |
@@ -117,6 +118,10 @@
 | Emergency events | ✅ | `GET /api/v1/admin/emergencies` — paginated |
 | System config list | ✅ | `GET /api/v1/admin/config` — all key-value entries |
 | Update config | ✅ | `PATCH /api/v1/admin/config/:key` — update value |
+| Hide review (moderation) | ✅ | `POST /api/v1/admin/ratings/:id/hide` — soft-hide review with reason |
+| Unhide review | ✅ | `POST /api/v1/admin/ratings/:id/unhide` — restore hidden review |
+| Thumbs analytics | ✅ | `GET /api/v1/admin/thumbs-analytics` — aggregate thumbs up/down stats, top drivers/passengers |
+| Passenger feedback list | ✅ | `GET /api/v1/admin/passenger-feedback` — all driver→passenger feedback, paginated with thumbs filter |
 
 ### 1.8 Leaderboard Routes (`src/routes/leaderboard.ts`)
 | Feature | Status | Notes |
@@ -127,36 +132,51 @@
 ### 1.9 Tips (`src/routes/tip.ts`)
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Create platform tip | ✅ | `POST /api/v1/tips` — creates tip record |
-| PayMongo webhook | 🟡 | `POST /api/v1/tips/webhook` — webhook handler exists, PayMongo integration partial |
+| Create platform tip | ✅ | `POST /api/v1/tips` — creates tip, initiates PayMongo checkout (GCash/Maya/Card) |
+| PayMongo webhook | ✅ | `POST /api/v1/tips/webhook` — public endpoint, updates tip status on payment |
 | Check tip status | ✅ | `GET /api/v1/tips/:id/status` |
 
-### 1.10 Reports (`src/routes/report.ts`)
+### 1.10 Subscriptions (`src/routes/subscription.ts`)
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Subscription checkout | ✅ | `POST /api/v1/subscriptions/checkout` — initiates PayMongo checkout for PRO (₱50/month) |
+| Subscription history | ✅ | `GET /api/v1/subscriptions/:driverId` — recent subscriptions |
+
+### 1.11 Reports (`src/routes/report.ts`)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Create report | ✅ | `POST /api/v1/reports` — with category, description, ride link |
 | Get report details | ✅ | `GET /api/v1/reports/:id` |
 
-### 1.11 Middleware
+### 1.12 Gamification (`src/routes/gamification.ts`)
+| Feature | Status | Notes |
+|---------|--------|-------|
+| List all badges | ✅ | `GET /api/v1/gamification/badges` — all available badges |
+| My badges + points | ✅ | `GET /api/v1/gamification/badges/me` — driver or passenger badges with total points |
+| Active challenges | ✅ | `GET /api/v1/gamification/challenges/active` — active seasonal challenges for user's role |
+| Award points | ✅ | `POST /api/v1/gamification/points/award` — award points to driver or passenger |
+
+### 1.13 Middleware
 | Feature | Status | File | Notes |
 |---------|--------|------|-------|
 | Error handler | ✅ | `src/middleware/errorHandler.ts` | Returns JSON error with status code, hides stack in production |
 | Rate limiter | ✅ | `src/middleware/rateLimiter.ts` | 100 req/15min default, 10 req/15min for auth |
 | Request logger | ✅ | `src/middleware/requestLogger.ts` | Logs method, URL, duration |
-| Auth middleware (JWT verify) | ❌ | 📋 | Needed for protected routes — not yet created |
-| Admin middleware (role check) | ❌ | 📋 | Commented out in admin.ts — not yet created |
+| Auth middleware (JWT verify) | ✅ | `src/middleware/auth.ts` | Verifies Bearer token, attaches req.user with userId/role/phone |
+| Admin middleware (role check) | ✅ | `src/middleware/auth.ts` | `requireRole('OWNER','STAFF')` guard on /admin/* routes |
+| Optional auth | ✅ | `src/middleware/auth.ts` | Attaches user if token present, doesn't reject |
 
-### 1.12 Firebase Admin (`src/lib/firebaseAdmin.ts`)
+### 1.14 Firebase Admin (`src/lib/firebaseAdmin.ts`)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Initialize from service account | ✅ | Loads JSON cert from `FIREBASE_SERVICE_ACCOUNT_PATH` |
 | Fallback to projectId-only | ✅ | Works if no service account file (for dev) |
 | Verify Firebase ID token | ✅ | `verifyFirebaseToken(idToken)` — used by auth route |
 
-### 1.13 Prisma / Database
+### 1.15 Prisma / Database
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Full schema (525+ lines) | ✅ | `prisma/schema.prisma` — all models, `preferredDriverId` on Ride, `PassengerFeedback` model for driver→passenger feedback |
+| Full schema (525+ lines) | ✅ | `prisma/schema.prisma` — all models, `preferredDriverId` on Ride, `PassengerFeedback` model, `isHidden`/`hiddenReason` on Review for moderation |
 | PostgreSQL (Supabase) | ✅ | Migrated from MySQL to Supabase PostgreSQL with connection pooling |
 | Seed script | ✅ | `prisma/seed.ts` — Digos City, fare rate, system config, owner account |
 | Database connection | ✅ | Supabase session pooler (IPv4) |
@@ -239,8 +259,9 @@ Users can:
 3. Select role (Passenger/Driver/Staff/Owner)
 4. **Passenger**: Book rides, see fare estimates, track active ride, rate/report drivers, emergency button, share ride, view history, rebook (if driver has Pro), view leaderboard
 5. **Driver**: Go online/offline, see pending ride requests, accept/counter-offer/decline, manage active ride, give passenger feedback (thumbs up/down), view earnings, view leaderboard, see rebook badges
-6. **Admin/Owner**: View dashboard with stats (including total fares), manage KYC, drivers, rides, reports, passengers, subscriptions, tips, ratings, strikes, emergencies, system config
-7. Logout
+6. **Admin/Owner**: View dashboard with stats (including total fares), manage KYC, drivers, rides, reports, passengers, subscriptions, tips, ratings (with moderation/hide), strikes, emergencies, system config, thumbs analytics, passenger feedback list
+7. **All users**: View/edit own profile, deactivate account, view badges & points, view seasonal challenges
+8. Logout
 
 ---
 
@@ -253,3 +274,7 @@ Users can:
 - **Subscription tiers**: Only FREE and PRO (ELITE removed from schema)
 - **Admin earnings**: Shows subscription revenue + tip revenue (not ride fares, which are driver cash earnings)
 - **Total fares card**: Shows sum of finalFare from completed rides (driver cash earnings audit, not platform revenue)
+- **Auth middleware**: JWT verification on all API routes except /auth and /health. Admin routes require OWNER or STAFF role.
+- **Socket.io**: JWT-authenticated, room-based (user:userId). Real-time events for ride requests, cancellations, counter-offers, and driver location broadcasting. Rebook rides only sent to preferred driver.
+- **PayMongo integration**: Tips and PRO subscriptions use PayMongo checkout (GCash/Maya/Card). Webhook endpoint is public (no auth). Falls back to dev mode (PENDING/ACTIVE without payment) when PAYMONGO_SECRET not configured.
+- **Gamification**: Badges, points, and seasonal challenges endpoints implemented. Points award endpoint for internal use by ride completion/rating flows.

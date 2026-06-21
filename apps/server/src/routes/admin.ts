@@ -624,4 +624,122 @@ router.get('/audit-log', async (req, res) => {
   }
 });
 
+// POST /api/v1/admin/ratings/:id/hide — moderate (hide) a review
+router.post('/ratings/:id/hide', async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const review = await prisma.review.update({
+      where: { id: req.params.id },
+      data: { isHidden: true, hiddenReason: reason || null },
+    });
+    res.json(review);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to hide review', message: err.message });
+  }
+});
+
+// POST /api/v1/admin/ratings/:id/unhide — unhide a review
+router.post('/ratings/:id/unhide', async (_req, res) => {
+  try {
+    const review = await prisma.review.update({
+      where: { id: _req.params.id },
+      data: { isHidden: false, hiddenReason: null },
+    });
+    res.json(review);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to unhide review', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/thumbs-analytics — aggregate thumbs up/down stats
+router.get('/thumbs-analytics', async (_req, res) => {
+  try {
+    // Driver review thumbs (passenger → driver)
+    const driverThumbsUp = await prisma.review.count({ where: { thumbsUp: true } });
+    const driverThumbsDown = await prisma.review.count({ where: { thumbsUp: false } });
+
+    // Passenger feedback thumbs (driver → passenger)
+    const passengerThumbsUp = await prisma.passengerFeedback.count({ where: { thumbsUp: true } });
+    const passengerThumbsDown = await prisma.passengerFeedback.count({ where: { thumbsUp: false } });
+
+    // Per-driver thumbs ratio (top 10 by thumbs up count)
+    const driverThumbs = await prisma.review.groupBy({
+      by: ['toDriverId'],
+      where: { thumbsUp: { not: null } },
+      _count: { id: true },
+    });
+
+    const driverIds = driverThumbs.map((d) => d.toDriverId);
+    const drivers = await prisma.driver.findMany({
+      where: { id: { in: driverIds } },
+      select: { id: true, name: true, plateNumber: true },
+    });
+    const driverMap = new Map(drivers.map((d) => [d.id, d]));
+
+    const driverStats = driverThumbs.map((d) => ({
+      ...driverMap.get(d.toDriverId),
+      totalThumbs: d._count.id,
+    })).filter((s) => s.id).sort((a, b) => b.totalThumbs - a.totalThumbs).slice(0, 10);
+
+    // Per-passenger thumbs ratio (top 10 by thumbs up count)
+    const passengerThumbs = await prisma.passengerFeedback.groupBy({
+      by: ['toPassengerId'],
+      _count: { id: true },
+    });
+
+    const passengerIds = passengerThumbs.map((p) => p.toPassengerId);
+    const passengers = await prisma.passenger.findMany({
+      where: { id: { in: passengerIds } },
+      select: { id: true, name: true },
+    });
+    const passengerMap = new Map(passengers.map((p) => [p.id, p]));
+
+    const passengerStats = passengerThumbs.map((p) => ({
+      ...passengerMap.get(p.toPassengerId),
+      totalFeedback: p._count.id,
+    })).filter((s) => s.id).sort((a, b) => b.totalFeedback - a.totalFeedback).slice(0, 10);
+
+    res.json({
+      driverThumbs: { up: driverThumbsUp, down: driverThumbsDown },
+      passengerThumbs: { up: passengerThumbsUp, down: passengerThumbsDown },
+      topDrivers: driverStats,
+      topPassengers: passengerStats,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get thumbs analytics', message: err.message });
+  }
+});
+
+// GET /api/v1/admin/passenger-feedback — list all driver→passenger feedback
+router.get('/passenger-feedback', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = 20;
+    const thumbsUpFilter = req.query.thumbsUp as string | undefined;
+
+    const where: any = {};
+    if (thumbsUpFilter === 'true') where.thumbsUp = true;
+    if (thumbsUpFilter === 'false') where.thumbsUp = false;
+
+    const [feedback, total] = await Promise.all([
+      prisma.passengerFeedback.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          from: { select: { name: true, plateNumber: true } },
+          to: { select: { name: true } },
+          ride: { select: { id: true, pickupAddress: true, dropoffAddress: true } },
+        },
+      }),
+      prisma.passengerFeedback.count({ where }),
+    ]);
+
+    res.json({ feedback, total, page, pages: Math.ceil(total / limit) });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get passenger feedback', message: err.message });
+  }
+});
+
 export default router;

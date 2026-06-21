@@ -115,4 +115,67 @@ router.get('/:id/places', async (req, res) => {
   }
 });
 
+// POST /api/v1/passengers/:id/kyc — submit KYC documents
+router.post('/:id/kyc', async (req, res) => {
+  try {
+    const { documentType, documentUrl } = req.body;
+    if (!documentType || !documentUrl) {
+      res.status(400).json({ error: 'documentType and documentUrl are required' });
+      return;
+    }
+
+    const passenger = await prisma.passenger.findUnique({ where: { id: req.params.id } });
+    if (!passenger) {
+      res.status(404).json({ error: 'Passenger not found' });
+      return;
+    }
+
+    const doc = await prisma.document.create({
+      data: {
+        passengerId: passenger.id,
+        type: documentType,
+        url: documentUrl,
+        status: 'PENDING',
+      },
+    });
+
+    await prisma.passenger.update({
+      where: { id: passenger.id },
+      data: { kycStatus: 'PENDING_REVIEW' },
+    });
+
+    res.status(201).json(doc);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to submit KYC', message: err.message });
+  }
+});
+
+// GET /api/v1/passengers/:id/badges — earned badges
+router.get('/:id/badges', async (req, res) => {
+  try {
+    const badges = await prisma.passengerBadge.findMany({
+      where: { passengerId: req.params.id },
+      include: { badge: true },
+      orderBy: { awardedAt: 'desc' },
+    });
+    res.json({ badges });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get badges', message: err.message });
+  }
+});
+
+// GET /api/v1/passengers/:id/points — points history
+router.get('/:id/points', async (req, res) => {
+  try {
+    const points = await prisma.passengerPoints.findMany({
+      where: { passengerId: req.params.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    const total = points.reduce((sum, p) => sum + p.points, 0);
+    res.json({ points, total });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get points', message: err.message });
+  }
+});
+
 export default router;

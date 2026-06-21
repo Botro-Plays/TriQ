@@ -26,6 +26,7 @@ import { setupSocketHandlers } from './socket';
 import { errorHandler } from './middleware/errorHandler';
 import { rateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
+import { authMiddleware, requireRole } from './middleware/auth';
 import { logger } from './lib/logger';
 import { seedDatabase } from './lib/seed';
 
@@ -36,9 +37,12 @@ import passengerRoutes from './routes/passenger';
 import driverRoutes from './routes/driver';
 import rideRoutes from './routes/ride';
 import tipRoutes from './routes/tip';
+import tipWebhookRoutes from './routes/tipWebhook';
 import adminRoutes from './routes/admin';
 import reportRoutes from './routes/report';
 import leaderboardRoutes from './routes/leaderboard';
+import subscriptionRoutes from './routes/subscription';
+import gamificationRoutes from './routes/gamification';
 
 const app = express();
 const httpServer = createServer(app);
@@ -72,16 +76,19 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// API Routes
+// API Routes (auth routes don't need JWT — they issue it)
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/passengers', passengerRoutes);
-app.use('/api/v1/drivers', driverRoutes);
-app.use('/api/v1/rides', rideRoutes);
-app.use('/api/v1/tips', tipRoutes);
-app.use('/api/v1/admin', adminRoutes);
-app.use('/api/v1/reports', reportRoutes);
-app.use('/api/v1/leaderboards', leaderboardRoutes);
+app.use('/api/v1/users', authMiddleware, userRoutes);
+app.use('/api/v1/passengers', authMiddleware, passengerRoutes);
+app.use('/api/v1/drivers', authMiddleware, driverRoutes);
+app.use('/api/v1/rides', authMiddleware, rideRoutes);
+app.use('/api/v1/tips', authMiddleware, tipRoutes);
+app.use('/api/v1/tips/webhook', tipWebhookRoutes); // public — PayMongo calls this
+app.use('/api/v1/admin', authMiddleware, requireRole('OWNER', 'STAFF'), adminRoutes);
+app.use('/api/v1/reports', authMiddleware, reportRoutes);
+app.use('/api/v1/leaderboards', authMiddleware, leaderboardRoutes);
+app.use('/api/v1/subscriptions', authMiddleware, subscriptionRoutes);
+app.use('/api/v1/gamification', authMiddleware, gamificationRoutes);
 
 // Socket.io
 setupSocketHandlers(io, prisma);
