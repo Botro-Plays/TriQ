@@ -84,9 +84,17 @@ export default function AdminKycQueue() {
                 href={doc.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full h-32 rounded-lg bg-triq-dark border border-triq-light/20 flex items-center justify-center text-triq-cyan text-sm hover:bg-triq-light/5"
+                className="block w-full h-32 rounded-lg bg-triq-dark border border-triq-light/20 overflow-hidden hover:border-triq-cyan/50 transition-colors"
               >
-                View Document
+                <img
+                  src={doc.url}
+                  alt={doc.type}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).parentElement!.innerHTML = '<span class="flex items-center justify-center h-full text-triq-cyan text-sm">View Document</span>';
+                  }}
+                />
               </a>
 
               {rejecting === doc.id ? (

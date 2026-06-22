@@ -3,6 +3,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import { Phone, Car, Star, Shield, Bike, MapPin, Crown, Award, Zap, X, Heart } from 'lucide-react';
 import TipModal from '../../components/TipModal';
+import FileUpload from '../../components/FileUpload';
 
 interface DriverData {
   id: string;
@@ -323,7 +324,7 @@ export default function DriverProfile() {
             <h3 className="text-sm font-semibold text-white">Submit KYC Documents</h3>
             <button onClick={() => setShowKycForm(false)} className="text-gray-400 hover:text-white"><X size={16} /></button>
           </div>
-          <p className="text-xs text-gray-400">Upload your documents to a hosting service (e.g. Imgur, Google Drive) and paste the direct links below.</p>
+          <p className="text-xs text-gray-400">Upload photos of your documents. Accepted: JPG, PNG (max 5 MB).</p>
           {kycDocs.map((doc, idx) => (
             <div key={idx} className="space-y-2">
               <select
@@ -334,12 +335,13 @@ export default function DriverProfile() {
                 <option value="">Select document type...</option>
                 {DRIVER_DOC_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
-              <input
-                type="url"
-                value={doc.url}
-                onChange={(e) => setKycDocs((prev) => prev.map((d, i) => i === idx ? { ...d, url: e.target.value } : d))}
-                placeholder="https://example.com/document.jpg"
-                className="w-full h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+              <FileUpload
+                userId={user?.id || ''}
+                docType={doc.type || 'doc'}
+                label="Click or drag to upload photo"
+                onUploaded={(url) => setKycDocs((prev) => prev.map((d, i) => i === idx ? { ...d, url } : d))}
+                onClear={() => setKycDocs((prev) => prev.map((d, i) => i === idx ? { ...d, url: '' } : d))}
+                currentUrl={doc.url || undefined}
               />
             </div>
           ))}

@@ -3,6 +3,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { api } from '../../lib/api';
 import { Phone, Shield, Award, Zap, X, MapPin, Heart } from 'lucide-react';
 import TipModal from '../../components/TipModal';
+import FileUpload from '../../components/FileUpload';
 
 interface PassengerData {
   id: string;
@@ -162,7 +163,7 @@ export default function PassengerProfile() {
             <h3 className="text-sm font-semibold text-white">Submit KYC Documents</h3>
             <button onClick={() => setShowKycForm(false)} className="text-gray-400 hover:text-white"><X size={16} /></button>
           </div>
-          <p className="text-xs text-gray-400">Upload your ID to a hosting service (e.g. Imgur, Google Drive) and paste the direct link below.</p>
+          <p className="text-xs text-gray-400">Upload photos of your ID and selfie. Accepted: JPG, PNG (max 5 MB).</p>
           <div className="space-y-2">
             <select
               value={docType}
@@ -172,20 +173,25 @@ export default function PassengerProfile() {
               <option value="">Select ID type...</option>
               {PASSENGER_DOC_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
-            <input
-              type="url"
-              value={docUrl}
-              onChange={(e) => setDocUrl(e.target.value)}
-              placeholder="https://example.com/id-front.jpg"
-              className="w-full h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
+            <FileUpload
+              userId={user?.id || ''}
+              docType={docType || 'id'}
+              label="Click or drag to upload ID photo"
+              onUploaded={(url) => setDocUrl(url)}
+              onClear={() => setDocUrl('')}
+              currentUrl={docUrl || undefined}
             />
-            <input
-              type="url"
-              value={selfieUrl}
-              onChange={(e) => setSelfieUrl(e.target.value)}
-              placeholder="https://example.com/selfie.jpg (optional)"
-              className="w-full h-10 px-3 rounded-lg bg-triq-dark border border-triq-light/30 text-white text-sm"
-            />
+            <div className="pt-2">
+              <p className="text-xs text-gray-500 mb-1">Selfie (optional)</p>
+              <FileUpload
+                userId={user?.id || ''}
+                docType="selfie"
+                label="Click or drag to upload selfie"
+                onUploaded={(url) => setSelfieUrl(url)}
+                onClear={() => setSelfieUrl('')}
+                currentUrl={selfieUrl || undefined}
+              />
+            </div>
           </div>
           <button
             onClick={submitKyc}
