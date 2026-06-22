@@ -44,14 +44,25 @@ function playAlertSound() {
   }
 }
 
-function showBrowserNotification(count: number) {
+async function showBrowserNotification(count: number) {
   if (Notification.permission === 'granted') {
-    new Notification('🚨 TriQ Emergency Alert', {
-      body: `${count} active emergency${count > 1 ? 'ies' : ''} require attention!`,
-      icon: '/icons/icon-192x192.png',
-      requireInteraction: true,
-      tag: 'triq-emergency',
-    });
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      reg.showNotification('🚨 TriQ Emergency Alert', {
+        body: `${count} active emergency${count > 1 ? 'ies' : ''} require attention!`,
+        icon: '/icons/icon-192x192.png',
+        requireInteraction: true,
+        tag: 'triq-emergency',
+      });
+    } catch {
+      // Fallback to regular notification
+      new Notification('🚨 TriQ Emergency Alert', {
+        body: `${count} active emergency${count > 1 ? 'ies' : ''} require attention!`,
+        icon: '/icons/icon-192x192.png',
+        requireInteraction: true,
+        tag: 'triq-emergency',
+      });
+    }
   }
 }
 
@@ -317,6 +328,23 @@ export default function AdminEmergencies() {
                   <MapPin size={11} /> View location on Google Maps
                 </a>
               )}
+            </div>
+
+            {/* Action checklist */}
+            <div className="bg-triq-dark/60 rounded-lg p-3 space-y-1.5 border border-triq-light/10">
+              <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Recommended Actions</p>
+              {[
+                'Call the passenger to verify the situation',
+                'Call the driver to assess from their side',
+                'Check the ride location on Google Maps',
+                'Contact local authorities if safety is at risk',
+                'Document outcome in the notes below',
+              ].map((step, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-gray-300">
+                  <span className="text-triq-cyan font-bold mt-0.5">{i + 1}.</span>
+                  <span>{step}</span>
+                </div>
+              ))}
             </div>
 
             <textarea

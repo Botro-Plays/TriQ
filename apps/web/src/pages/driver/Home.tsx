@@ -39,7 +39,7 @@ interface PendingRide {
   hasSeniorCitizen: boolean;
   hasStudent: boolean;
   hasExtraBaggage: boolean;
-  passenger: { name: string; user?: { phoneNumber: string } };
+  passenger: { id: string; name: string };
   preferredDriverId?: string | null;
 }
 
@@ -57,7 +57,7 @@ interface ActiveRide {
   counterOfferExpiresAt: string | null;
   negotiatedFare: number | null;
   startedAt: string | null;
-  passenger: { id: string; name: string; user: { phoneNumber: string } };
+  passenger: { id: string; name: string; user: { phoneNumber: string | null } };
 }
 
 interface EarningsSummary {
@@ -106,6 +106,7 @@ export default function DriverHome() {
   const [tipCustom, setTipCustom] = useState('');
   const [tipping, setTipping] = useState(false);
   const [tipSuccess, setTipSuccess] = useState(false);
+  const [driverTier, setDriverTier] = useState<string>('FREE');
 
   // Get driver profile
   useEffect(() => {
@@ -114,6 +115,7 @@ export default function DriverHome() {
       .then((res) => {
         setDriverId(res.data.id);
         setIsOnline(res.data.isOnline);
+        setDriverTier(res.data.subscriptionTier || 'FREE');
         // If already online, restore location from DB and restart location watch
         if (res.data.isOnline && res.data.currentLat && res.data.currentLng) {
           setLocation({ lat: res.data.currentLat, lng: res.data.currentLng });
@@ -521,15 +523,21 @@ export default function DriverHome() {
             </div>
             <div className="flex-1">
               <p className="text-white font-semibold text-sm">{activeRide.passenger.name}</p>
-              <p className="text-gray-400 text-xs">{activeRide.passenger.user.phoneNumber}</p>
+              <p className="text-gray-400 text-xs">ID: {activeRide.passenger.id}</p>
             </div>
-            <a
-              href={`tel:${activeRide.passenger.user.phoneNumber}`}
-              className="shrink-0 w-9 h-9 rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 flex items-center justify-center active:scale-90"
-              title="Call passenger"
-            >
-              <Phone size={16} />
-            </a>
+            {['PRO', 'ELITE'].includes(driverTier) && activeRide.passenger.user?.phoneNumber ? (
+              <a
+                href={`tel:${activeRide.passenger.user.phoneNumber}`}
+                className="shrink-0 w-9 h-9 rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 flex items-center justify-center active:scale-90"
+                title="Call passenger"
+              >
+                <Phone size={16} />
+              </a>
+            ) : !['PRO', 'ELITE'].includes(driverTier) ? (
+              <span className="text-[10px] text-gray-500 text-right max-w-[80px] leading-tight">
+                Upgrade to VIP to call passenger
+              </span>
+            ) : null}
             {activeRide.negotiatedFare ? (
               <div className="text-right">
                 <span className="text-gray-500 line-through text-xs">₱{(activeRide.estimatedFare / 100).toFixed(0)}</span>
@@ -809,15 +817,6 @@ function RideRequestCard({
         >
           Counter
         </button>
-        {ride.passenger.user?.phoneNumber && (
-          <a
-            href={`tel:${ride.passenger.user.phoneNumber}`}
-            className="h-10 w-10 rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 flex items-center justify-center active:scale-90 shrink-0"
-            title="Call passenger"
-          >
-            <Phone size={16} />
-          </a>
-        )}
         <button
           onClick={onDecline}
           className="h-10 px-3 rounded-lg border border-triq-light/30 text-gray-400 text-sm font-medium"

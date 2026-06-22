@@ -281,7 +281,7 @@ export default function PassengerHome() {
   const cancelRide = async (reason?: string) => {
     if (!activeRide) return;
     try {
-      await api.post(`/rides/${activeRide.id}/cancel`, { reason: reason || 'Cancelled by passenger' });
+      await api.post(`/rides/${activeRide.id}/cancel`, { reason: reason || 'Cancelled by passenger', cancelledBy: 'PASSENGER' });
       setActiveRide(null);
       setStep('idle');
     } catch {}
@@ -843,7 +843,7 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
   };
 
   const shareRide = () => {
-    const text = `TriQ Ride: ${ride.pickupAddress} → ${ride.dropoffAddress} | Fare: ₱${fare.toFixed(0)}${ride.driver ? ` | Driver: ${ride.driver.name} (${ride.driver.plateNumber})` : ''}`;
+    const text = `TriQ Ride: ${ride.pickupAddress} → ${ride.dropoffAddress} | Fare: ₱${fare.toFixed(0)}${ride.driver ? ` | Driver: ${ride.driver.plateNumber}` : ''}`;
     if (navigator.share) {
       navigator.share({ title: 'My TriQ Ride', text });
     } else {
@@ -1010,6 +1010,7 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
           <div className="flex-1 min-w-0">
             <p className="text-white font-semibold text-sm truncate">{ride.driver.name}</p>
             <p className="text-gray-400 text-xs">{ride.driver.plateNumber} · ⭐ {ride.driver.rating.toFixed(1)}</p>
+            <p className="text-gray-500 text-[10px]">Driver ID: {ride.driver.id}</p>
           </div>
           {ride.driver.user?.phoneNumber && (
             <a
@@ -1085,13 +1086,18 @@ function ActiveRideCard({ ride, onCancel }: { ride: ActiveRide; onCancel: (reaso
         )}
       </div>
 
-      {!['COMPLETED', 'CANCELLED'].includes(ride.status) && (
+      {['REQUESTED', 'COUNTER_OFFERED'].includes(ride.status) && (
         <button
           onClick={handleCancelClick}
           className="w-full h-10 rounded-lg border border-red-500/30 text-red-400 text-sm font-medium hover:bg-red-500/10"
         >
           Cancel Ride
         </button>
+      )}
+      {['ACCEPTED', 'COUNTER_OFFER_ACCEPTED', 'ARRIVING', 'IN_PROGRESS'].includes(ride.status) && (
+        <p className="text-xs text-center text-gray-500 py-1">
+          Cannot cancel after driver has accepted. Contact support if there is an issue.
+        </p>
       )}
 
       {/* Emergency hold overlay */}

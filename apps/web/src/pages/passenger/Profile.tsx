@@ -114,6 +114,7 @@ export default function PassengerProfile() {
         <div>
           <p className="text-white font-semibold text-lg">{passenger?.name || user?.phoneNumber || 'Unknown'}</p>
           <p className="text-gray-400 text-sm">Passenger · Trust Score: {passenger?.trustScore?.toFixed(1) || '—'}</p>
+          <p className="text-gray-500 text-xs font-mono">ID: {user?.id}</p>
         </div>
       </div>
 

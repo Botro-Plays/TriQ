@@ -15,6 +15,22 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Mask passenger name: "Juan Dela Cruz" → "Juan D."
+function maskPassengerName(name: string): string {
+  if (!name) return 'Passenger';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
+}
+
+// Mask driver name: "Juan Dela Cruz" → "Juan D."
+function maskDriverName(name: string): string {
+  if (!name) return 'Driver';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
+}
+
 // Fallback fare estimation using Haversine (when OSRM unavailable)
 function estimateFareFallback(pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number, baseFare: number, perKmRate: number): number {
   const straightLineKm = haversine(pickupLat, pickupLng, dropoffLat, dropoffLng);
@@ -172,7 +188,7 @@ router.post('/', async (req, res) => {
       if (prefDriver?.fcmToken) {
         await sendPush(prefDriver.fcmToken, {
           title: '🛺 Rebook Request!',
-          body: `${ride.passenger.name} is requesting you specifically. Tap to view.`,
+          body: `${maskPassengerName(ride.passenger.name)} is requesting you specifically. Tap to view.`,
           data: { rideId: ride.id, type: 'REBOOK' },
         });
       }
@@ -252,13 +268,14 @@ router.get('/pending', async (req, res) => {
       orderBy: { createdAt: 'asc' },
       take: 20,
       include: {
-        passenger: { select: { name: true, user: { select: { phoneNumber: true } } } },
+        passenger: { select: { id: true, name: true } },
       },
     });
 
     const nearby = rides
       .map((r: { id: string; pickupLat: number; pickupLng: number; [key: string]: any }) => ({
         ...r,
+        passenger: { id: r.passenger.id, name: maskPassengerName(r.passenger.name) },
         distance: haversine(lat, lng, r.pickupLat, r.pickupLng),
       }))
       .filter((r: { distance: number }) => r.distance <= radiusKm)
@@ -352,7 +369,31 @@ router.get('/active', async (req, res) => {
       },
     });
 
-    res.json({ ride });
+    if (!ride) {
+      res.json({ ride: null });
+      return;
+    }
+
+    // Determine if the requester is a driver and if they are VIP
+    let isVipDriver = false;
+    if (driverId) {
+      const drv = await prisma.driver.findUnique({ where: { id: driverId as string }, select: { subscriptionTier: true, subscriptionStatus: true } });
+      isVipDriver = drv?.subscriptionStatus === 'ACTIVE' && ['PRO', 'ELITE'].includes(drv?.subscriptionTier as string);
+    }
+
+    // Mask names; only expose passenger phone to VIP drivers
+    const maskedPassenger = {
+      id: ride.passenger.id,
+      name: maskPassengerName(ride.passenger.name),
+      photoUrl: ride.passenger.photoUrl,
+      user: isVipDriver ? ride.passenger.user : { phoneNumber: null },
+    };
+    const maskedDriver = ride.driver ? {
+      ...ride.driver,
+      name: maskDriverName(ride.driver.name),
+    } : null;
+
+    res.json({ ride: { ...ride, passenger: maskedPassenger, driver: maskedDriver } });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get active ride', message: err.message });
   }
@@ -373,7 +414,12 @@ router.get('/:id', async (req, res) => {
       res.status(404).json({ error: 'Ride not found' });
       return;
     }
-    res.json(ride);
+    // Mask names before sending to client
+    res.json({
+      ...ride,
+      passenger: { ...ride.passenger, name: maskPassengerName(ride.passenger.name) },
+      driver: ride.driver ? { ...ride.driver, name: maskDriverName(ride.driver.name) } : null,
+    });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to get ride', message: err.message });
   }
@@ -425,12 +471,17 @@ router.post('/:id/accept', async (req, res) => {
     if (passenger?.fcmToken) {
       await sendPush(passenger.fcmToken, {
         title: '🎉 Driver Accepted!',
-        body: `${updated.driver?.name} (${updated.driver?.plateNumber}) is on the way.`,
+        body: `${maskDriverName(updated.driver?.name || '')} (${updated.driver?.plateNumber}) is on the way.`,
         data: { rideId: ride.id, type: 'ACCEPTED' },
       });
     }
 
-    res.json(updated);
+    // Mask names before sending to client
+    res.json({
+      ...updated,
+      passenger: { ...updated.passenger, name: maskPassengerName(updated.passenger.name) },
+      driver: updated.driver ? { ...updated.driver, name: maskDriverName(updated.driver.name) } : null,
+    });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to accept ride', message: err.message });
   }
@@ -457,7 +508,7 @@ router.post('/:id/decline', async (req, res) => {
 // POST /api/v1/rides/:id/cancel — passenger or driver cancels
 router.post('/:id/cancel', async (req, res) => {
   try {
-    const { reason } = req.body;
+    const { reason, cancelledBy } = req.body;
     const ride = await prisma.ride.findUnique({ where: { id: req.params.id } });
     if (!ride) {
       res.status(404).json({ error: 'Ride not found' });
@@ -465,6 +516,11 @@ router.post('/:id/cancel', async (req, res) => {
     }
     if (['COMPLETED', 'CANCELLED'].includes(ride.status)) {
       res.status(409).json({ error: 'Ride cannot be cancelled' });
+      return;
+    }
+    // Passengers cannot cancel once a driver has accepted — prevents scam/abuse
+    if (cancelledBy === 'PASSENGER' && ['ACCEPTED', 'ARRIVING', 'IN_PROGRESS', 'COUNTER_OFFER_ACCEPTED'].includes(ride.status)) {
+      res.status(409).json({ error: 'Cannot cancel after driver has accepted. Contact support if there is an issue.' });
       return;
     }
 

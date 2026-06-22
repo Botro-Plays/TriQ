@@ -18,6 +18,7 @@ export function useFCM() {
     if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
 
     let cancelled = false;
+    let unsubscribeMessage: (() => void) | null = null;
 
     const register = async () => {
       try {
@@ -67,7 +68,8 @@ export function useFCM() {
 
         // Handle foreground messages — use SW showNotification so it works even
         // when the app tab is active (new Notification() is suppressed by Chrome)
-        onMessage(messaging, async (payload) => {
+        // Store unsubscribe so we don't accumulate duplicate handlers on re-render
+        unsubscribeMessage = onMessage(messaging, async (payload) => {
           console.log('[FCM] Foreground message received:', payload.notification?.title);
           const title = payload.notification?.title || 'TriQ';
           const body = payload.notification?.body || '';
@@ -94,6 +96,9 @@ export function useFCM() {
     };
 
     register();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (unsubscribeMessage) unsubscribeMessage();
+    };
   }, [user?.id, role]);
 }

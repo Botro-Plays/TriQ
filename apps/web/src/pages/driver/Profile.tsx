@@ -212,6 +212,7 @@ export default function DriverProfile() {
         <div>
           <p className="text-white font-semibold text-lg">{driver?.name || user?.phoneNumber || 'Unknown'}</p>
           <p className="text-gray-400 text-sm">Driver · {driver?.subscriptionTier || 'FREE'}</p>
+          <p className="text-gray-500 text-xs font-mono">ID: {user?.id}</p>
         </div>
       </div>
 
