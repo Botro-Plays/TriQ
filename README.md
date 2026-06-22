@@ -38,11 +38,20 @@ One PWA serves all user roles:
 
 | Role | Route | Features |
 |---|---|---|
-| **Passenger** | `/passenger` | Book rides, track drivers, manage profile |
-| **Driver** | `/driver` | Go online/offline, accept requests, view earnings |
-| **Admin / Staff** | `/admin` | KYC queue, driver management, ride monitoring, reports |
+| **Passenger** | `/passenger` | Book rides, track drivers, manage profile, emergency button, share ride, rate/report |
+| **Driver** | `/driver` | Go online/offline, accept requests, view earnings, VIP countdown timer, call passenger (VIP only) |
+| **Admin / Staff** | `/admin` | KYC queue, driver management, ride monitoring, reports, emergencies, grant VIP, PayMongo config |
 
 No separate mobile apps — works in any modern browser. Installable as PWA.
+
+## Privacy & Safety
+
+- **Name masking**: All ride API responses mask passenger and driver names to `First L.` format (server-side). Admin routes show full names.
+- **VIP-only phone access**: Passenger phone numbers only exposed to PRO/ELITE drivers. FREE drivers see passenger ID only.
+- **User IDs**: Displayed on driver and passenger profiles for reporting/reference.
+- **Passenger cancel restriction**: Passengers cannot cancel rides after a driver has accepted. Contact support instead.
+- **Emergency system**: Dedicated admin emergency page with alert sounds, browser notifications, and action checklist.
+- **FCM push notifications**: Ride events, emergencies, subscriptions, and tips — with proper cleanup to prevent duplicates.
 
 ## Quick Start (Local)
 

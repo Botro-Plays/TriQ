@@ -1,5 +1,5 @@
 # TriQ — Implementation Status Audit
-> Last updated: 2026-06-21
+> Last updated: 2026-06-22
 > This document tracks what is ACTUALLY implemented vs what is planned/stubbed.
 
 ## Legend
@@ -76,13 +76,13 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Create ride request | ✅ | `POST /api/v1/rides` — per-pax pricing, LGU discounts, baggage fee, driver tip, preferredDriverId (rebook) |
-| Get pending rides | ✅ | `GET /api/v1/rides/pending` — filtered by radius, auto-cancel stale, rebook rides only visible to preferred driver |
+| Get pending rides | ✅ | `GET /api/v1/rides/pending` — filtered by radius, auto-cancel stale, rebook rides only visible to preferred driver. **Passenger names masked** to `First L.`; no phone numbers exposed. |
 | Fare estimate | ✅ | `GET /api/v1/rides/estimate` — per-pax with discounts, distance, fare breakdown |
-| Get active ride | ✅ | `GET /api/v1/rides/active` — by passengerId or driverId, includes driver/passenger/review |
-| Get ride details | ✅ | `GET /api/v1/rides/:id` — includes status history |
-| Driver accepts ride | ✅ | `POST /api/v1/rides/:id/accept` — validates status, blocks non-preferred drivers for rebook rides |
+| Get active ride | ✅ | `GET /api/v1/rides/active` — by passengerId or driverId, includes driver/passenger/review. **Names masked** to `First L.`. **Passenger phone only exposed to PRO/ELITE drivers** (FREE drivers get `phoneNumber: null`). |
+| Get ride details | ✅ | `GET /api/v1/rides/:id` — includes status history. **Names masked** to `First L.` format. |
+| Driver accepts ride | ✅ | `POST /api/v1/rides/:id/accept` — validates status, blocks non-preferred drivers for rebook rides. **Names masked** in response + FCM push body. |
 | Driver declines ride | ✅ | `POST /api/v1/rides/:id/decline` |
-| Cancel ride | ✅ | `POST /api/v1/rides/:id/cancel` — with reason |
+| Cancel ride | ✅ | `POST /api/v1/rides/:id/cancel` — with reason. **Passengers cannot cancel after driver accepts** (ACCEPTED/ARRIVING/IN_PROGRESS/COUNTER_OFFER_ACCEPTED). Body: `{ reason, cancelledBy: 'PASSENGER' \| 'DRIVER' }`. Backend returns 409 if passenger tries to cancel accepted ride. |
 | Mark arriving | ✅ | `POST /api/v1/rides/:id/arriving` |
 | Start ride | ✅ | `POST /api/v1/rides/:id/start` |
 | Complete ride | ✅ | `POST /api/v1/rides/:id/complete` — sets finalFare, updates driver stats |
@@ -117,7 +117,9 @@
 | Ratings list | ✅ | `GET /api/v1/admin/ratings` — paginated with rating level filter |
 | Strikes list | ✅ | `GET /api/v1/admin/strikes` — paginated |
 | Revoke strike | ✅ | `POST /api/v1/admin/strikes/:id/revoke` |
-| Emergency events | ✅ | `GET /api/v1/admin/emergencies` — paginated |
+| Emergency events | ✅ | `GET /api/v1/admin/emergencies` — paginated with status filter |
+| Resolve emergency | ✅ | `PATCH /api/v1/admin/emergencies/:id/resolve` — sets status to RESOLVED or FALSE_ALARM, resolvedAt, resolvedBy, notes |
+| Grant free VIP | ✅ | `POST /api/v1/admin/grant-vip` — grants PRO or ELITE subscription for free (7/30/90 days). Driver autocomplete, tier + duration picker. Stored as Subscription with amount=0. Dashboard shows separate "Admin-Granted VIP" card. |
 | System config list | ✅ | `GET /api/v1/admin/config` — all key-value entries |
 | Update config | ✅ | `PATCH /api/v1/admin/config/:key` — update value |
 | PayMongo config (GET) | ✅ | `GET /api/v1/admin/paymongo` — returns masked API keys, webhook URL, `proSubscriptionPrice`, `eliteSubscriptionPrice` (centavos) |
@@ -202,16 +204,16 @@
 | Feature | Status | File | Notes |
 |---------|--------|------|-------|
 | **Login page** | ✅ | `src/pages/Login.tsx` | Phone OTP + Google Sign-In, role selection, owner-exists check |
-| Passenger Home | ✅ | `src/pages/passenger/Home.tsx` | Map, ride booking, fare estimate, active ride card, emergency, share, report, rate, counter-offer, rebook support |
+| Passenger Home | ✅ | `src/pages/passenger/Home.tsx` | Map, ride booking, fare estimate, active ride card, emergency, share, report, rate, counter-offer, rebook support. **Cancel button hidden after driver accepts** — shows "Cannot cancel" message instead. **Driver ID shown** on ride card. **Driver name removed from share text**. |
 | Passenger Map | ✅ | `src/pages/passenger/Map.tsx` | Interactive OSM map with driver markers |
-| Passenger Profile | ✅ | `src/pages/passenger/Profile.tsx` | Profile with saved places |
+| Passenger Profile | ✅ | `src/pages/passenger/Profile.tsx` | Profile with saved places. **User ID displayed** in header for reporting. |
 | Passenger History | ✅ | `src/pages/passenger/History.tsx` | Ride history with rate, report, rebook (subscription-gated) |
 | Passenger Leaderboard | ✅ | `src/pages/shared/Leaderboard.tsx` | This Week / This Month / All Time tabs, rides/tips/ratings metrics |
-| Driver Home | ✅ | `src/pages/driver/Home.tsx` | Online toggle, pending rides, active ride, counter-offer, rebook badge, post-ride passenger feedback modal (thumbs up/down) |
+| Driver Home | ✅ | `src/pages/driver/Home.tsx` | Online toggle, pending rides, active ride, counter-offer, rebook badge, post-ride passenger feedback modal (thumbs up/down). **Call passenger button gated to VIP (PRO/ELITE) only** — FREE drivers see "Upgrade to VIP" hint. **Passenger ID shown** instead of phone number for FREE drivers. Call button removed from pending ride cards (pre-accept). |
 | Driver Earnings | ✅ | `src/pages/driver/Earnings.tsx` | Daily/weekly/monthly/all-time earnings |
-| Driver Profile | ✅ | `src/pages/driver/Profile.tsx` | PRO/ELITE upgrade cards (side-by-side for FREE, upgrade-to-ELITE for PRO, active badge for ELITE), prices dynamic from `/subscriptions/price` |
+| Driver Profile | ✅ | `src/pages/driver/Profile.tsx` | PRO/ELITE upgrade cards (side-by-side for FREE, upgrade-to-ELITE for PRO, active badge for ELITE), prices dynamic from `/subscriptions/price`. **VIP countdown timer** (live days/hours/minutes/seconds). **User ID displayed** in header for reporting. |
 | Driver Leaderboard | ✅ | `src/pages/shared/Leaderboard.tsx` | This Week / This Month / All Time tabs, rides/earnings/rating metrics |
-| Admin Dashboard | ✅ | `src/pages/admin/Dashboard.tsx` | Stats grid with total fares, subscription + tip revenue, tier breakdown |
+| Admin Dashboard | ✅ | `src/pages/admin/Dashboard.tsx` | Stats grid with total fares, subscription + tip revenue, tier breakdown. **Separate "Admin-Granted VIP" card** counting free VIP grants vs paid subscriptions. |
 | Admin KYC Queue | ✅ | `src/pages/admin/KycQueue.tsx` | Document review with approve/reject |
 | Admin Drivers | ✅ | `src/pages/admin/Drivers.tsx` | Driver list with suspend/unsuspend |
 | Admin Rides | ✅ | `src/pages/admin/Rides.tsx` | Ride monitoring with filters |
@@ -221,9 +223,10 @@
 | Admin Passengers | ✅ | `src/pages/admin/Passengers.tsx` | Passenger list with suspend/reinstate |
 | Admin Ratings | ✅ | `src/pages/admin/Ratings.tsx` | Ratings list with filter |
 | Admin PayMongo Settings | ✅ | `src/pages/admin/PayMongo.tsx` | API key configuration, webhook URL, PRO & ELITE subscription price fields (₱/month, admin-configurable) |
+| Admin Emergencies | ✅ | `src/pages/admin/Emergencies.tsx` | Dedicated emergency page with 15-second polling, alert sounds (Web Audio API beeps), browser notifications (via `serviceWorker.showNotification()`), resolve modal with recommended action checklist. Sound toggle. Status filter (ACTIVE/RESOLVED/FALSE_ALARM). |
 | Passenger Home | ✅ | `src/pages/passenger/Home.tsx` | Nearby driver list shows PRO (cyan badge) and ELITE (yellow badge) with tier-based highlight cards; up to 5 shown; driver names masked (`First L.` format) |
-| Push Notifications (FCM) | ✅ | `src/hooks/useFCM.ts` + `public/firebase-messaging-sw.js` | Requests permission, gets token, saves to server. Background push via SW, foreground via Notification API. Requires `VITE_FIREBASE_VAPID_KEY`. |
-| Name Privacy | ✅ | `src/lib/maskName.ts` | `maskName()` utility masks names to `First L.` format. Applied in leaderboards + nearby drivers. Admin routes show full names. |
+| Push Notifications (FCM) | ✅ | `src/hooks/useFCM.ts` + `public/firebase-messaging-sw.js` | Requests permission, gets token, saves to server. Background push via SW, foreground via `serviceWorker.showNotification()`. **`onMessage` listener properly unsubscribed in cleanup** to prevent duplicate notifications. Requires `VITE_FIREBASE_VAPID_KEY`. |
+| Name Privacy | ✅ | `src/lib/maskName.ts` + server-side `maskPassengerName()` / `maskDriverName()` | `maskName()` utility masks names to `First L.` format. Applied in leaderboards + nearby drivers (client-side). **Server-side masking** applied to all ride API responses (`GET /rides/active`, `GET /rides/:id`, `POST /rides/:id/accept`, `GET /rides/pending`) and FCM push notification bodies. Admin routes show full names. |
 | Automated Ride Reminders | ✅ | `src/lib/rideCron.ts` | Cron job (every 5 min via `node-cron`): pending not accepted after 10 min → passenger, accepted not started after 45 min → both, in-progress > 2 hrs → both. |
 
 ### 2.3 Components
@@ -265,10 +268,10 @@ Users can:
 1. Visit `https://triq.dpdns.org/login`
 2. Sign in with **Phone OTP** (Firebase) or **Google Sign-In**
 3. Select role (Passenger/Driver/Staff/Owner)
-4. **Passenger**: Book rides, see fare estimates, track active ride, rate/report drivers, emergency button, share ride, view history, rebook (if driver has Pro), view leaderboard
-5. **Driver**: Go online/offline, see pending ride requests, accept/counter-offer/decline, manage active ride, give passenger feedback (thumbs up/down), view earnings, view leaderboard, see rebook badges
-6. **Admin/Owner**: View dashboard with stats (including total fares), manage KYC, drivers, rides, reports, passengers, subscriptions, tips, ratings (with moderation/hide), strikes, emergencies, system config, thumbs analytics, passenger feedback list
-7. **All users**: View/edit own profile, deactivate account, view badges & points, view seasonal challenges
+4. **Passenger**: Book rides, see fare estimates, track active ride, rate/report drivers, emergency button, share ride (driver name removed from share text), view history, rebook (if driver has Pro), view leaderboard. **Cannot cancel ride after driver accepts** — sees "Contact support" message instead. **Driver ID shown** on ride card.
+5. **Driver**: Go online/offline, see pending ride requests (passenger names masked), accept/counter-offer/decline, manage active ride, give passenger feedback (thumbs up/down), view earnings, view leaderboard, see rebook badges. **Call passenger button only for PRO/ELITE** — FREE drivers see upgrade hint. **VIP countdown timer** on profile showing time until subscription expires.
+6. **Admin/Owner**: View dashboard with stats (including total fares, separate admin-granted VIP card), manage KYC, drivers, rides, reports, passengers, subscriptions, tips, ratings (with moderation/hide), strikes, emergencies (dedicated page with alert sounds + action checklist), system config, PayMongo settings, thumbs analytics, passenger feedback list. **Grant free VIP** to drivers (PRO/ELITE for 7/30/90 days). **Resolve emergencies** with recommended action checklist.
+7. **All users**: View/edit own profile (with **user ID displayed** for reporting), deactivate account, view badges & points, view seasonal challenges
 8. Logout
 
 ---
@@ -287,6 +290,12 @@ Users can:
 - **PayMongo integration**: Tips and subscriptions (PRO/ELITE) use PayMongo checkout (GCash/Maya/Card/QRPH). Webhook endpoint is public (no auth), uses `express.raw` for raw body capture, HMAC-SHA256 signature verification over `timestamp.rawBody`. Payment matching via `payment_intent_id` stored as `paymongoId` on Tip/Subscription records. Falls back to dev mode (PENDING/ACTIVE without payment) when `PAYMONGO_SECRET_KEY` not configured. Admin can configure API keys, webhook secret, and subscription prices via `/admin` → PayMongo Settings.
 - **FCM Push Notifications**: Firebase Cloud Messaging via `firebase-admin` (server) + `firebase/messaging` (client). Token saved per driver/passenger. Events: rebook request → driver, ride accepted → passenger, driver arriving → passenger, ride started → passenger, ride completed → passenger, counter-offer received → passenger, counter-offer accepted/rejected → driver, ride cancelled → both parties, subscription activated → driver, tip paid → passenger. Background handled by `/firebase-messaging-sw.js` service worker. Requires `VITE_FIREBASE_VAPID_KEY` (generate in Firebase Console → Project Settings → Cloud Messaging → Web Push Certificates).
 - **Nearby sort**: ELITE → PRO → FREE (by tier weight), then by distance within each tier. ELITE gets 1.2× effective pickup radius (wider visibility). Driver names masked (`First L.` format) in nearby response for privacy.
-- **Name privacy**: `maskName()` utility (`src/lib/maskName.ts`) applied to all public-facing name fields — leaderboards (drivers + passengers), nearby driver list. Admin routes still show full names for KYC/management.
+- **Name privacy**: `maskName()` utility (`src/lib/maskName.ts`) applied to all public-facing name fields — leaderboards (drivers + passengers), nearby driver list. **Server-side masking** via `maskPassengerName()` / `maskDriverName()` (`src/routes/ride.ts`) applied to all ride API responses and FCM push notification bodies. Admin routes still show full names for KYC/management.
+- **Passenger cancel restriction**: Passengers cannot cancel rides after a driver has accepted (ACCEPTED/ARRIVING/IN_PROGRESS/COUNTER_OFFER_ACCEPTED). Backend returns 409 with "Contact support" message. Frontend hides cancel button and shows explanatory text. Prevents abuse where passenger cancels after driver has invested time/fuel.
+- **VIP-only call passenger**: Only PRO/ELITE drivers can call passengers via the call button. Backend only includes `passenger.user.phoneNumber` in the active ride response if the requesting driver is PRO/ELITE. Frontend gates the call button to `['PRO', 'ELITE'].includes(driverTier)` and shows "Upgrade to VIP" hint for FREE drivers. Call button removed from pending ride cards (pre-accept).
+- **FCM duplicate fix**: `onMessage()` listener in `useFCM.ts` is properly unsubscribed in the effect cleanup function. Prevents accumulating duplicate notification handlers across React re-renders.
+- **Emergency page**: Dedicated `/admin/emergencies` page with 15-second polling, Web Audio API alert sounds (beeps), browser notifications via `serviceWorker.ready.showNotification()` (not `new Notification()` which Chrome suppresses in foreground), and a resolve modal with recommended action checklist.
+- **Admin-granted VIP**: Admin can grant free PRO or ELITE subscriptions via `POST /admin/grant-vip` with configurable duration (7/30/90 days). Stored as Subscription with `amount=0`. Dashboard shows separate "Admin-Granted VIP" card counting these grants, distinct from paid subscription revenue.
+- **VIP countdown timer**: Driver profile shows live countdown (days/hours/minutes/seconds) until subscription expires. Uses `subscriptionExpiresAt` from the driver profile API response.
 - **Automated ride reminders**: Cron job (`src/lib/rideCron.ts`, every 5 min via `node-cron`) sends push notifications for stale rides: REQUESTED not accepted after 10 min → passenger, ACCEPTED/ARRIVING not started after 45 min → both, IN_PROGRESS > 2 hours → both. Sliding 5-min window prevents duplicate notifications.
 - **Gamification**: Badges, points, and seasonal challenges endpoints implemented. Points award endpoint for internal use by ride completion/rating flows.

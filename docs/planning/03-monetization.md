@@ -88,7 +88,9 @@ Driver signs up ──► Free Pro Trial (7 days, tracked in Subscription as `is
 - **Tip paid**: Passenger receives FCM push ("❤️ Tip Sent!") when PayMongo webhook confirms tip payment
 
 ### Privacy
-- **Name masking**: All public-facing name fields (leaderboards, nearby driver list) use `maskName()` to show `First L.` format instead of full names. Admin routes retain full names for KYC and management purposes.
+- **Name masking**: All public-facing name fields (leaderboards, nearby driver list, ride API responses) use `maskName()` / `maskPassengerName()` / `maskDriverName()` to show `First L.` format instead of full names. Admin routes retain full names for KYC and management purposes.
+- **VIP-only phone access**: Passenger phone numbers are only exposed to PRO/ELITE drivers in the active ride response. FREE drivers see passenger ID only — no phone number, no call button. This is a VIP perk that incentivizes subscription upgrades.
+- **User IDs**: Both driver and passenger profiles display user IDs for reporting/reference purposes.
 
 ---
 

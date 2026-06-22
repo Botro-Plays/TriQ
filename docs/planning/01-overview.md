@@ -28,15 +28,29 @@ To modernize tricycle transportation in Digos City by connecting passengers with
 - **Map Coverage**: Entire Digos City + immediate outskirts (Barangay boundaries, landmarks, terminals)
 
 ## Development Status
-- Phase: **MVP Backend Scaffold + Auth Complete**
+- Phase: **MVP Complete — Deployed & Functional**
 - Authentication: ✅ Firebase Phone OTP + Google Sign-In, JWT, Owner claiming
-- Database: ✅ Prisma schema complete (all gap-analysis models), MySQL on VPS, seeded with Digos City data
-- CI/CD: ✅ GitHub Actions → VPS auto-deploy with PM2
-- Frontend: 🟡 Login page complete, all other pages are placeholder stubs
-- Backend Routes: 🟡 Auth fully implemented, all other routes return 501
-- Next step: Implement core ride flow (KYC → Driver online → Create/Accept ride → Complete)
+- Database: ✅ Prisma schema complete, PostgreSQL on Supabase, seeded with Digos City data
+- CI/CD: ✅ GitHub Actions build check → Render auto-deploy
+- Frontend: ✅ All pages implemented (passenger, driver, admin)
+- Backend Routes: ✅ All routes implemented (auth, rides, drivers, passengers, admin, tips, subscriptions, gamification, leaderboards, reports)
+- Real-time: ✅ Socket.io for live location and ride status
+- Push Notifications: ✅ FCM for ride events, emergencies, subscriptions, tips
+- Deployed: ✅ https://triq.dpdns.org
 
-## Recently Completed (2026-06-20)
+## Recently Completed (2026-06-22)
+- Name masking: Passenger and driver names masked server-side in all ride API responses (`First L.` format)
+- User ID display: Both driver and passenger profiles show user ID for reporting/reference
+- Passenger cancel restriction: Passengers cannot cancel rides after driver has accepted (ACCEPTED/ARRIVING/IN_PROGRESS)
+- VIP-only call passenger: Only PRO/ELITE drivers can call passengers; FREE drivers see upgrade hint
+- FCM duplicate fix: `onMessage` handler properly unsubscribed in cleanup to prevent duplicate notifications
+- Emergency browser notification fix: Uses `serviceWorker.ready.showNotification()` instead of `new Notification()` for foreground reliability
+- Emergency resolve modal: Added recommended action checklist (call passenger, call driver, check maps, contact authorities, document outcome)
+- Admin dashboard: Separate "Admin-Granted VIP" card counting free VIP grants vs paid subscriptions
+- VIP countdown timer: Live days/hours/minutes/seconds countdown on driver profile for PRO/ELITE subscriptions
+- Driver GET endpoints: Include `subscriptionExpiresAt` for frontend countdown timer
+
+## Recently Completed (2026-06-21)
 - Fixed Prisma Client generation on VPS (packaged from GitHub Actions)
 - Fixed dotenv loading under PM2 (`__dirname`-based path)
 - Google Sign-In as alternative to phone OTP

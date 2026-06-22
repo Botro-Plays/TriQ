@@ -36,12 +36,14 @@
 - [ ] Ride request button with confirmation modal
 
 #### Active Ride
-- [ ] Real-time driver location on map (Socket.io stream)
-- [ ] Driver info card (name, plate number, photo, rating)
-- [ ] Ride status timeline: Requested → Accepted → Arriving → In Progress → Completed
-- [ ] Cancel ride button (free if no driver accepted; penalty if driver already accepted)
-- [ ] Call driver button (direct phone call, not in-app)
-- [ ] **Only 1 pending booking at a time**: passenger cannot request a new ride while another is pending/ongoing
+- [x] Real-time driver location on map (Socket.io stream)
+- [x] Driver info card (name, plate number, photo, rating)
+- [x] **Names masked** to `First L.` format for privacy
+- [x] **Driver ID displayed** on ride card for reporting
+- [x] Ride status timeline: Requested → Accepted → Arriving → In Progress → Completed
+- [x] Cancel ride button — **only available before driver accepts** (REQUESTED/COUNTER_OFFERED states). After driver accepts, button replaced with "Cannot cancel after driver has accepted. Contact support if there is an issue."
+- [x] Call driver button (direct phone call, not in-app)
+- [x] **Only 1 pending booking at a time**: passenger cannot request a new ride while another is pending/ongoing
 - [ ] **Auto-cancel pending booking** (with reconfirmation prompts to avoid false positives):
   - **30 min**: Push notification: "Your ride is still pending. Still need it? Tap to keep active." (no penalty)
   - **60 min**: Push notification: "No drivers have accepted yet. Keep waiting or cancel?" (no penalty)
@@ -75,9 +77,10 @@
 - [ ] **Points deduction**: Fake ride = -50 passenger points; leaderboard disqualification for repeated offenses
 
 #### Safety & Reporting
-- [x] **Emergency button** during active ride (3-second hold to prevent accidental press) — primary: silent alert to admin (email/SMS); fallback: call configured emergency contact; option: call barangay tanod
-- [x] **Share ride details** — send live ride link to trusted contact
-- [ ] **Report history** — view status of submitted reports (pending / resolved / dismissed)
+- [x] **Emergency button** during active ride (3-second hold to prevent accidental press) — creates EmergencyEvent, alerts admin
+- [x] **Admin emergency page**: Dedicated `/admin/emergencies` page with 15-second polling, alert sounds (Web Audio API beeps), browser notifications (via service worker `showNotification()`), and resolve modal with recommended action checklist
+- [x] **Share ride details** — send live ride link to trusted contact (driver name removed from share text, plate number only)
+- [x] **Report history** — view status of submitted reports (pending / resolved / dismissed)
 
 #### Ride History
 - [x] List of past rides with date, route, fare
@@ -138,19 +141,21 @@
 - [ ] Annual re-verification reminder (franchise/ID expiry)
 
 #### Dashboard (Home)
-- [ ] Toggle online/offline status
-- [ ] Earnings summary (today, this week, this month)
-- [ ] Subscription status banner (Free / Pro / Elite + expiry date)
-- [ ] Upgrade to Pro/Elite button → PayMongo checkout (prices admin-configurable)
+- [x] Toggle online/offline status
+- [x] Earnings summary (today, this week, this month)
+- [x] Subscription status banner (Free / Pro / Elite + expiry date)
+- [x] **VIP countdown timer**: Live days/hours/minutes/seconds countdown on driver profile for PRO/ELITE subscriptions
+- [x] Upgrade to Pro/Elite button → PayMongo checkout (prices admin-configurable)
 
 #### Map & Ride Requests
-- [ ] Interactive OSM map with current location
-- [ ] Ride request popup:
+- [x] Interactive OSM map with current location
+- [x] Ride request popup:
   - Passenger location, destination, **pickup distance from driver**, estimated fare
   - **Ride details**: passenger count, senior/student flags, extra baggage flag
   - Passenger rating (thumbs ratio)
-- [ ] **Call passenger** button (direct phone call — appears BEFORE accept, to clarify details, pickup location, or negotiate verbally)
-- [ ] Accept / **Counter-offer** / Decline buttons (10-second auto-decline if no action)
+  - **Passenger name masked** to `First L.` format; **passenger ID shown** for reference
+- [x] **Call passenger** button — **VIP only** (PRO/ELITE). FREE drivers see "Upgrade to VIP to call passenger" hint. Button only appears on active ride (after accepting), not on pending ride cards.
+- [x] Accept / **Counter-offer** / Decline buttons
   - **Counter-offer**: Driver enters proposed fare (can include pickup distance rationale); sent to passenger for approval
   - Counter-offer expires in 5 minutes; if accepted, ride proceeds at agreed fare
 - [ ] **Configurable pickup radius**: Driver sets max distance they're willing to travel to pick up passengers (default: 2km). Only requests within this radius appear.
@@ -209,12 +214,14 @@
 #### Safety & Reporting
 - [x] **Emergency button** during active ride
 - [x] **Share ride details** — live ride link to family/contact
-- [ ] **Report history** — view status of submitted reports
+- [x] **Report history** — view status of submitted reports
 
 #### Subscription
-- [ ] Current tier display with benefits list
-- [ ] Upgrade / Renew / Cancel subscription
-- [ ] Payment history (subscription invoices)
+- [x] Current tier display with benefits list
+- [x] **VIP countdown timer**: Live days/hours/minutes/seconds until subscription expires
+- [x] Upgrade / Renew subscription via PayMongo checkout
+- [x] **Admin-granted free VIP**: Admin can grant PRO or ELITE for configurable duration (7/30/90 days) at no cost
+- [x] Payment history (subscription invoices)
 
 #### Gamification & Leaderboard
 - [ ] **Driver Points System**: earn points for every completed ride, 5-star rating, consecutive login days
@@ -380,6 +387,7 @@ Public-facing marketing site served at root domain.
 - [x] Revenue from platform tips (₱)
 - [x] Total fares from completed rides (₱)
 - [x] Subscription tier breakdown (active / Pro counts)
+- [x] **Admin-Granted VIP card**: Separate card showing count of admin-granted free VIP subscriptions (PRO + ELITE breakdown), distinct from paid subscription counts
 - [ ] Map view of all active rides and online drivers
 
 #### KYC & Document Review
@@ -428,13 +436,15 @@ Public-facing marketing site served at root domain.
 
 #### Ride Monitoring
 - [ ] Real-time map of all rides
-- [ ] Ride detail view (passenger, driver, route, status, fare, estimated fare, actual fare if driver entered it)
-- [ ] **All rides list**: Search/filter by date range, passenger, driver, status, fare range
-- [ ] **Ride fare summary view**: Per-ride breakdown of estimated vs actual fare (if entered by driver)
-- [ ] **Counter-offer log**: Track all counter-offers (driver, proposed fare, reason, passenger response, expiry time)
-- [ ] Intervene / cancel ride if needed
+- [x] Ride detail view (passenger, driver, route, status, fare, estimated fare, actual fare if driver entered it)
+- [x] **All rides list**: Search/filter by date range, passenger, driver, status, fare range
+- [x] **Ride fare summary view**: Per-ride breakdown of estimated vs actual fare (if entered by driver)
+- [x] **Counter-offer log**: Track all counter-offers (driver, proposed fare, reason, passenger response, expiry time)
+- [x] Intervene / cancel ride if needed
 - [ ] Dispute resolution panel
-- [ ] **Emergency response log**: All emergency button presses with timestamp, ride link, location, alert type (admin/SMS/call), resolution status
+- [x] **Emergency response log**: All emergency button presses with timestamp, ride link, location, alert type, resolution status
+- [x] **Dedicated emergency page**: `/admin/emergencies` with 15-second polling, alert sounds (Web Audio API), browser notifications (via service worker), and resolve modal with recommended action checklist
+- [x] **Emergency resolve**: Admin can mark as RESOLVED or FALSE_ALARM with notes; includes recommended action checklist (call passenger, call driver, check maps, contact authorities, document outcome)
 
 #### Ratings & Reviews Management
 - [x] **All ratings list**: View every passenger→driver rating (1-5 stars, comment, thumbs up/down)
@@ -488,6 +498,7 @@ Public-facing marketing site served at root domain.
 - [ ] **Subscription detail per driver**: Tier history, payment history, expiry dates, grace period status
 - [x] Platform tip transaction log (all tips with status filter, total paid tips)
 - [ ] **Tip analytics**: Tipping conversion rate, average tip amount, tips by time of day, tips by ride count
+- [x] **Admin grant free VIP**: Admin can grant PRO or ELITE subscription for free with configurable duration (7/30/90 days). Stored as Subscription with amount=0. Counted separately on dashboard from paid subscriptions.
 
 #### App Configuration & Feature Flags
 - [x] **System config viewer**: View all key-value config entries

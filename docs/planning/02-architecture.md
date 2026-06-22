@@ -175,6 +175,8 @@
 
 ### Data Protection
 - Phone numbers masked in logs and non-admin APIs
+- **Name masking**: All ride API responses mask passenger and driver names to `First L.` format (server-side via `maskPassengerName()` / `maskDriverName()`). Applies to: `GET /rides/active`, `GET /rides/:id`, `POST /rides/:id/accept`, `GET /rides/pending`, and FCM push notification bodies. Admin routes show full names for KYC/management.
+- **VIP-only phone access**: Passenger phone numbers only exposed to PRO/ELITE drivers in the active ride response. FREE drivers see passenger ID only — no phone number, no call button.
 - Driver exact home address never exposed to passengers
 - Passenger pickup/dropoff only shared with assigned driver
 - Profile photos resized + compressed before storage (Sharp)
@@ -182,8 +184,13 @@
 
 ### Ride Safety
 - Both parties see each other's verified name + photo before ride starts
+- **Names masked** to `First L.` format in ride cards for privacy
+- **User IDs displayed** on driver and passenger profiles for reporting/reference
 - Real-time ride status visible to admin dashboard
 - One-tap emergency contact/share ride details button
+- **Passenger cancel restriction**: Passengers cannot cancel rides after a driver has accepted (ACCEPTED/ARRIVING/IN_PROGRESS/COUNTER_OFFER_ACCEPTED). Cancel button hidden in UI; backend returns 409 with "Contact support" message.
+- **VIP-only call passenger**: Only PRO/ELITE drivers can call passengers via the call button. FREE drivers see an "Upgrade to VIP" hint instead.
+- **Emergency page**: Dedicated `/admin/emergencies` page with polling, alert sounds (Web Audio API), browser notifications (via service worker), and a resolve modal with recommended action checklist.
 - Ride cancellation reason required (data for safety analysis)
 - Admin can forcibly cancel any active ride and alert both parties
 

@@ -140,8 +140,8 @@ Response: 204 No Content
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `POST` | `/rides` | Yes (KYC) | Create ride request (with ride details: pax, senior, student, baggage) |
-| `GET` | `/rides/:id` | Yes | Get ride details |
-| `POST` | `/rides/:id/accept` | Yes (Driver) | Driver accepts ride (original estimated fare) |
+| `GET` | `/rides/:id` | Yes | Get ride details. **Names masked** to `First L.` format. |
+| `POST` | `/rides/:id/accept` | Yes (Driver) | Driver accepts ride (original estimated fare). **Names masked** in response + FCM push. |
 | `POST` | `/rides/:id/counter-offer` | Yes (Driver) | Driver proposes different fare (pickup distance rationale) |
 | `POST` | `/rides/:id/counter-offer/accept` | Yes (Passenger) | Passenger accepts counter-offer (ride proceeds at agreed fare) |
 | `POST` | `/rides/:id/counter-offer/reject` | Yes (Passenger) | Passenger rejects counter-offer (ride back to REQUESTED for others) |
@@ -149,14 +149,14 @@ Response: 204 No Content
 | `POST` | `/rides/:id/arrived` | Yes (Driver) | Driver arrived at pickup |
 | `POST` | `/rides/:id/start` | Yes (Driver) | Start ride (passenger boarded) |
 | `POST` | `/rides/:id/complete` | Yes (Driver) | Complete ride |
-| `POST` | `/rides/:id/cancel` | Yes | Cancel ride (passenger or driver) |
+| `POST` | `/rides/:id/cancel` | Yes | Cancel ride (passenger or driver). **Passengers cannot cancel after driver accepts** (ACCEPTED/ARRIVING/IN_PROGRESS/COUNTER_OFFER_ACCEPTED). Body: `{ reason, cancelledBy: 'PASSENGER' | 'DRIVER' }` |
 | `POST` | `/rides/:id/rate` | Yes (Passenger) | Rate driver |
 | `POST` | `/rides/:id/review` | Yes (Passenger) | Submit review (rating + thumbs up + comment) |
 | `POST` | `/rides/:id/passenger-feedback` | Yes (Driver) | Driver gives thumbs up/down to passenger |
 | `POST` | `/rides/:id/thumbs` | Yes | Thumbs up/down the other party |
 | `POST` | `/rides/:id/report` | Yes | Report the other party |
 | `POST` | `/rides/:id/tip` | Yes (Passenger) | Platform tip (₱1–₱20) |
-| `GET` | `/rides/active` | Yes | Get current active ride (if any) |
+| `GET` | `/rides/active` | Yes | Get current active ride (if any). **Names masked** to `First L.` format. **Passenger phone only exposed to PRO/ELITE drivers**. |
 
 ### Nearby Drivers (Geospatial)
 | Method | Endpoint | Auth | Description |
@@ -176,7 +176,7 @@ Response:
     "drivers": [
       {
         "id": "uuid",
-        "name": "Juan Dela Cruz",
+        "name": "Juan D.",
         "photoUrl": "...",
         "plateNumber": "ABC-123",
         "rating": 4.8,
@@ -210,7 +210,7 @@ Response:
   "entries": [
     {
       "id": "uuid",
-      "name": "Juan Dela Cruz",
+      "name": "Juan D.",
       "photoUrl": "...",
       "rank": 1,
       "score": 42,
@@ -232,7 +232,7 @@ Response:
   "entries": [
     {
       "id": "uuid",
-      "name": "Maria Santos",
+      "name": "Maria S.",
       "photoUrl": "...",
       "rank": 1,
       "score": 92,
@@ -295,6 +295,11 @@ Response:
 | `GET` | `/admin/config` | Current app configuration |
 | `PATCH` | `/admin/config` | Update app configuration |
 | `GET` | `/admin/health` | API health metrics |
+| `POST` | `/admin/grant-vip` | Grant free VIP subscription (PRO/ELITE) to a driver for configurable duration (7/30/90 days). Stored as Subscription with amount=0. |
+| `GET` | `/admin/emergencies` | List emergency events (paginated, filterable by status) |
+| `PATCH` | `/admin/emergencies/:id/resolve` | Resolve emergency (RESOLVED or FALSE_ALARM) with notes. Sets resolvedAt, resolvedBy. |
+| `GET` | `/admin/paymongo` | PayMongo API key config (masked keys, webhook URL, subscription prices) |
+| `PUT` | `/admin/paymongo` | Update PayMongo API keys, webhook secret, PRO/ELITE prices |
 
 ---
 
@@ -420,9 +425,10 @@ Response:
 
 #### `passenger:ride:cancel`
 ```json
-{ "rideId": "uuid", "reason": "DRIVER_TOO_FAR" }
+{ "rideId": "uuid", "reason": "DRIVER_TOO_FAR", "cancelledBy": "PASSENGER" }
 ```
 - Passenger cancels ride
+- **Passengers cannot cancel after driver accepts** (ACCEPTED/ARRIVING/IN_PROGRESS/COUNTER_OFFER_ACCEPTED). Backend returns 409.
 - Server checks cancellation window (free <2 min, tracked >2 min)
 
 #### `system:ride:reconfirm-30min`
@@ -481,7 +487,7 @@ Response:
   "timestamp": "2026-01-15T08:30:00Z",
   "driver": {
     "id": "uuid",
-    "name": "Juan Dela Cruz",
+    "name": "Juan D.",
     "photoUrl": "...",
     "plateNumber": "ABC-123",
     "rating": 4.8,

@@ -57,6 +57,8 @@
 
 **Solutions — Strike-Based Deterrent (No Escrow)**:
 - **5-strike system** for both passengers and drivers, escalating from warning → 24h ban → 7d ban → 30d ban → permanent deactivation
+- **Passenger cancel restriction**: Passengers cannot cancel rides after a driver has accepted (ACCEPTED/ARRIVING/IN_PROGRESS/COUNTER_OFFER_ACCEPTED). Backend returns 409; UI hides cancel button and shows "Contact support" message. Prevents abuse where passenger cancels after driver has invested time/fuel.
+- **VIP-only call passenger**: Only PRO/ELITE drivers can call passengers. FREE drivers cannot access passenger phone numbers. Reduces potential harassment from unverified/free drivers.
 - **Ride validation**: Minimum distance (≥200m) + minimum time (≥2 min) before ride counts as "completed" for points/badges
 - **GPS proximity validation**: Backend checks driver is within 100m of pickup before "Arrived" status allowed
 - **Cancellation tracking**: Free cancellation within 2 min; after that, reason required. Pattern analysis flags repeat offenders.
@@ -163,6 +165,9 @@
 |-------|---------------|---------|
 | **Database encryption** | PostgreSQL `sslmode=require` + LUKS disk encryption | Data at rest protected |
 | **Phone number masking** | Last 4 digits only in non-admin APIs | Privacy protection |
+| **Name masking in ride APIs** | `maskPassengerName()` / `maskDriverName()` — all ride endpoints return `First L.` format | Privacy protection — prevents full name exposure to strangers |
+| **VIP-only phone access** | Passenger phone only exposed to PRO/ELITE drivers in active ride response | Incentivizes VIP subscription; protects passenger privacy from FREE drivers |
+| **User ID display** | Both driver and passenger profiles show user ID for reporting | Enables reporting without exposing full identity |
 | **Document photo access** | Signed URLs with 5-minute expiry | Prevent direct linking to KYC photos |
 | **Audit logging** | Every admin action logged to immutable table | Accountability; regulator requests |
 | **GDPR/Data Privacy Act compliance** | Right to data export; right to deletion (soft delete) | Philippine Data Privacy Act of 2012 compliance |
